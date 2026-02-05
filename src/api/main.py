@@ -3,6 +3,7 @@ from src.api.schemas import QueryRequest, QueryResponse, Citation
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer_async, classify_query_async
 import logging
+import os
 import time
 
 # Logs
@@ -14,6 +15,12 @@ app = FastAPI(
     description="Production-ready RAG API with source attribution and confidence scoring",
     version="1.1.0"
 )
+
+
+@app.on_event("startup")
+async def validate_env():
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
 
 
 @app.get("/health")
@@ -37,7 +44,7 @@ async def query_endpoint(request: QueryRequest):
         pass
 
     # 3. Retrieve (sync - FAISS is CPU-bound, fast enough)
-    search_results = perform_search(final_query, k=5)
+    search_results = perform_search(final_query, k=request.k)
 
     # 4. Synthesize (async - non-blocking LLM call)
     synthesis_result = await synthesize_answer_async(final_query, search_results)

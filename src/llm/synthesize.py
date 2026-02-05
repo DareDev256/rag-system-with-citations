@@ -35,11 +35,18 @@ def get_async_llm_client():
     return _async_llm_client
 
 
-def extract_cited_doc_ids(answer: str) -> Set[str]:
-    """Extract all [doc_id] citations from the answer text."""
+def extract_cited_doc_ids(answer: str, available_ids: Set[str] = None) -> Set[str]:
+    """Extract all [doc_id] citations from the answer text.
+
+    If available_ids is provided, only returns IDs that match actual
+    documents from search results, filtering out hallucinated citations.
+    """
     pattern = r'\[([^\]]+)\]'
     matches = re.findall(pattern, answer)
-    return set(matches)
+    cited = set(matches)
+    if available_ids is not None:
+        cited = cited & available_ids
+    return cited
 
 
 def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set[str]) -> float:
@@ -125,8 +132,9 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
         )
         answer = response.choices[0].message.content.strip()
 
-        # Parse citations from the answer
-        cited_ids = extract_cited_doc_ids(answer)
+        # Parse citations from the answer, validating against available doc IDs
+        available_ids = {res["doc_id"] for res in search_results}
+        cited_ids = extract_cited_doc_ids(answer, available_ids)
 
         # Filter to only actually cited sources
         citations_used = [
@@ -199,8 +207,9 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
         )
         answer = response.choices[0].message.content.strip()
 
-        # Parse citations from the answer
-        cited_ids = extract_cited_doc_ids(answer)
+        # Parse citations from the answer, validating against available doc IDs
+        available_ids = {res["doc_id"] for res in search_results}
+        cited_ids = extract_cited_doc_ids(answer, available_ids)
 
         # Filter to only actually cited sources
         citations_used = [

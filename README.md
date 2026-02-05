@@ -51,6 +51,52 @@ A production-ready Retrieval-Augmented Generation (RAG) API that provides ground
     ```
     Access docs at `http://localhost:8000/docs`.
 
+## API Usage
+
+### Query Endpoint
+
+Send a POST request to `/query` with a JSON body:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is retrieval-augmented generation?"}'
+```
+
+Specify the number of documents to retrieve with the `k` parameter (1-20, default 5):
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "How does FAISS indexing work?", "k": 3}'
+```
+
+**Expected response format:**
+
+```json
+{
+  "query": "What is retrieval-augmented generation?",
+  "category": "factual",
+  "answer": "Retrieval-augmented generation (RAG) is ... [doc_001]",
+  "citations": [
+    {
+      "doc_id": "doc_001",
+      "snippet": "RAG combines retrieval with generation...",
+      "score": 0.92,
+      "source": "rag_overview.txt"
+    }
+  ],
+  "confidence": 0.85,
+  "latency_ms": 1234.56
+}
+```
+
+### Health Check
+
+```bash
+curl http://localhost:8000/health
+```
+
 ## Evaluation
 
 Run the offline evaluation suite:
