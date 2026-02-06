@@ -2,6 +2,8 @@
 
 Tests only pure functions — no FAISS, no API calls, no LLM calls.
 """
+import time
+
 import pytest
 from pydantic import ValidationError
 
@@ -9,6 +11,8 @@ from src.api.schemas import QueryRequest, QueryResponse, Citation
 from src.llm.synthesize import extract_cited_doc_ids, calculate_confidence
 from src.llm.prompt import build_context_str
 from src.eval.metrics import calculate_citation_coverage, estimate_hallucination_rate
+from src.data.ingest import load_documents
+from src.utils.timing import measure_latency
 
 
 # ── build_context_str ────────────────────────────────────────────
@@ -214,3 +218,153 @@ class TestCitationCoverage:
 class TestHallucinationRate:
     def test_placeholder_returns_fixed_value(self):
         assert estimate_hallucination_rate("answer", "context") == 0.1
+
+
+# ── load_documents (data ingestion) ─────────────────────────────
+
+class TestLoadDocuments:
+    def test_nonexistent_directory_returns_empty(self, tmp_path):
+        result = load_documents(str(tmp_path / "does_not_exist"))
+        assert result == []
+
+    def test_empty_directory_returns_empty(self, tmp_path):
+        result = load_documents(str(tmp_path))
+        assert result == []
+
+    def test_single_file_single_paragraph(self, tmp_path):
+        (tmp_path / "notes.txt").write_text("RAG combines retrieval with generation.")
+        docs = load_documents(str(tmp_path))
+        assert len(docs) == 1
+        assert docs[0]["doc_id"] == "notes.txt_0"
+        assert docs[0]["text"] == "RAG combines retrieval with generation."
+        assert docs[0]["source"] == "notes.txt"
+
+    def test_single_file_multiple_paragraphs(self, tmp_path):
+        (tmp_path / "guide.txt").write_text("First paragraph.\n\nSecond paragraph.")
+        docs = load_documents(str(tmp_path))
+        assert len(docs) == 2
+        texts = [d["text"] for d in docs]
+        assert "First paragraph." in texts
+        assert "Second paragraph." in texts
+
+    def test_empty_paragraphs_skipped(self, tmp_path):
+        # Double newlines with only whitespace between them
+        (tmp_path / "sparse.txt").write_text("Content here.\n\n\n\n  \n\nMore content.")
+        docs = load_documents(str(tmp_path))
+        texts = [d["text"] for d in docs]
+        assert len(texts) == 2
+        assert "Content here." in texts
+        assert "More content." in texts
+
+    def test_multiple_files(self, tmp_path):
+        (tmp_path / "a.txt").write_text("Alpha content.")
+        (tmp_path / "b.txt").write_text("Beta content.")
+        docs = load_documents(str(tmp_path))
+        assert len(docs) == 2
+        sources = {d["source"] for d in docs}
+        assert sources == {"a.txt", "b.txt"}
+
+    def test_non_txt_files_ignored(self, tmp_path):
+        (tmp_path / "data.txt").write_text("Included.")
+        (tmp_path / "data.csv").write_text("col1,col2\na,b")
+        (tmp_path / "data.json").write_text('{"key": "value"}')
+        docs = load_documents(str(tmp_path))
+        assert len(docs) == 1
+        assert docs[0]["source"] == "data.txt"
+
+    def test_doc_id_format_includes_paragraph_index(self, tmp_path):
+        (tmp_path / "paper.txt").write_text("Para zero.\n\nPara one.\n\nPara two.")
+        docs = load_documents(str(tmp_path))
+        doc_ids = [d["doc_id"] for d in docs]
+        assert "paper.txt_0" in doc_ids
+        assert "paper.txt_1" in doc_ids
+        assert "paper.txt_2" in doc_ids
+
+    def test_whitespace_stripped_from_paragraphs(self, tmp_path):
+        (tmp_path / "messy.txt").write_text("  leading spaces  \n\n  trailing too  ")
+        docs = load_documents(str(tmp_path))
+        assert docs[0]["text"] == "leading spaces"
+        assert docs[1]["text"] == "trailing too"
+
+
+# ── measure_latency (timing decorator) ──────────────────────────
+
+class TestMeasureLatency:
+    def test_injects_latency_into_dict_result(self):
+        @measure_latency
+        def returns_dict():
+            return {"answer": "hello"}
+
+        result = returns_dict()
+        assert "latency_ms" in result
+        assert isinstance(result["latency_ms"], float)
+        assert result["answer"] == "hello"
+
+    def test_does_not_overwrite_existing_latency(self):
+        @measure_latency
+        def preset_latency():
+            return {"answer": "hi", "latency_ms": 999.0}
+
+        result = preset_latency()
+        # The decorator checks 'latency_ms' not in result, so it skips
+        assert result["latency_ms"] == 999.0
+
+    def test_injects_latency_into_object_with_attribute(self):
+        class Response:
+            def __init__(self):
+                self.latency_ms = -1.0  # sentinel value
+                self.data = "test"
+
+        @measure_latency
+        def returns_obj():
+            return Response()
+
+        result = returns_obj()
+        # Decorator should overwrite the sentinel with actual timing
+        assert result.latency_ms >= 0.0
+        assert result.data == "test"
+
+    def test_handles_non_dict_non_object_result(self):
+        @measure_latency
+        def returns_string():
+            return "plain string"
+
+        # Should not raise — just returns the value unchanged
+        result = returns_string()
+        assert result == "plain string"
+
+    def test_preserves_function_name(self):
+        @measure_latency
+        def my_function():
+            """My docstring."""
+            return {}
+
+        assert my_function.__name__ == "my_function"
+        assert my_function.__doc__ == "My docstring."
+
+    def test_latency_reflects_actual_time(self):
+        @measure_latency
+        def slow_function():
+            time.sleep(0.05)  # 50ms
+            return {"data": True}
+
+        result = slow_function()
+        # Should be at least 40ms (allowing some scheduling variance)
+        assert result["latency_ms"] >= 40.0
+
+    def test_passes_args_and_kwargs(self):
+        @measure_latency
+        def add(a, b, extra=0):
+            return {"sum": a + b + extra}
+
+        result = add(2, 3, extra=10)
+        assert result["sum"] == 15
+        assert "latency_ms" in result
+
+    def test_returns_none_without_error(self):
+        @measure_latency
+        def returns_none():
+            return None
+
+        result = returns_none()
+        assert result is None
