@@ -143,13 +143,14 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-33 unit tests covering core logic (pure functions only — no external dependencies):
+64 tests across two suites — pure function tests and mock-based LLM pipeline tests:
 
 ```bash
 pytest tests/ -v
 ```
 
-Tests cover: context formatting, citation extraction, confidence calculation, schema validation, and evaluation metrics.
+- **`test_core.py`** (50 tests): Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement
+- **`test_llm.py`** (14 tests): Mock-based tests for `classify_query` and `synthesize_answer` — validates category fallback logic, citation parsing, error handling, and hallucination filtering without API calls
 
 ## Configuration
 
