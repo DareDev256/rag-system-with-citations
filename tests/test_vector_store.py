@@ -54,6 +54,53 @@ class TestAddDocuments:
         assert vs.metadata == [{"doc_id": "a"}, {"doc_id": "b"}]
 
 
+class TestCreateIndex:
+    @patch("src.retrieval.vector_store.faiss.IndexFlatIP")
+    def test_creates_inner_product_index(self, mock_ip):
+        mock_ip.return_value = MagicMock()
+        vs = VectorStore()
+        vs.create_index(384)
+        mock_ip.assert_called_once_with(384)
+        assert vs.index is not None
+        assert vs.metadata == []
+
+    @patch("src.retrieval.vector_store.faiss.IndexFlatIP")
+    def test_resets_metadata_on_recreate(self, mock_ip):
+        mock_ip.return_value = MagicMock()
+        vs = VectorStore()
+        vs.metadata = [{"doc_id": "old"}]
+        vs.create_index(128)
+        assert vs.metadata == []
+
+
+class TestSaveIndex:
+    def test_noop_when_no_index(self):
+        vs = VectorStore()
+        vs.save_index()  # should not raise
+
+    @patch("src.retrieval.vector_store.faiss.write_index")
+    @patch("src.retrieval.vector_store.pickle.dump")
+    def test_saves_index_and_metadata(self, mock_pickle, mock_write):
+        vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.pkl")
+        vs.index = MagicMock()
+        vs.metadata = [{"doc_id": "d1"}]
+        with patch("builtins.open", mock_open()):
+            vs.save_index()
+        mock_write.assert_called_once_with(vs.index, "/tmp/idx.bin")
+        mock_pickle.assert_called_once()
+        assert mock_pickle.call_args[0][0] == [{"doc_id": "d1"}]
+
+    @patch("src.retrieval.vector_store.faiss.write_index")
+    @patch("src.retrieval.vector_store.pickle.dump")
+    def test_saves_empty_metadata(self, mock_pickle, mock_write):
+        vs = VectorStore()
+        vs.index = MagicMock()
+        vs.metadata = []
+        with patch("builtins.open", mock_open()):
+            vs.save_index()
+        assert mock_pickle.call_args[0][0] == []
+
+
 class TestSearch:
     def test_no_index_returns_empty(self):
         assert VectorStore().search([0.1, 0.2]) == []
