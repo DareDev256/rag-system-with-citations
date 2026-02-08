@@ -143,14 +143,24 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-64 tests across two suites — pure function tests and mock-based LLM pipeline tests:
+142 tests across 8 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, and integration tests:
 
 ```bash
 pytest tests/ -v
 ```
 
-- **`test_core.py`** (50 tests): Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement
-- **`test_llm.py`** (14 tests): Mock-based tests for `classify_query` and `synthesize_answer` — validates category fallback logic, citation parsing, error handling, and hallucination filtering without API calls
+| Suite | Tests | Coverage |
+|-------|-------|----------|
+| `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
+| `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
+| `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
+| `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
+| `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
+| `test_search.py` | 14 | `Embedder` singleton behavior, `get_search_engine` factory, `perform_search` orchestration |
+| `test_integration_gaps.py` | 13 | Environment validation, ingest pipeline, LLM client factory functions (sync + async) |
+| `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
+
+All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
 
 ## Configuration
 
