@@ -1,4 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from src.api.schemas import QueryRequest, QueryResponse, Citation
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer_async, classify_query_async
@@ -13,8 +16,34 @@ logger = logging.getLogger("rag_api")
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.1.0"
+    version="1.2.0",
+    docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
+    redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response: Response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+# CORS — restrict to explicit origins in production
+allowed_origins = os.getenv("CORS_ORIGINS", "").split(",")
+allowed_origins = [o.strip() for o in allowed_origins if o.strip()]
+if allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Authorization"],
+    )
 
 
 @app.on_event("startup")
@@ -35,7 +64,8 @@ async def query_endpoint(request: QueryRequest):
 
     # 1. Classify (async - non-blocking)
     category = await classify_query_async(original_query)
-    logger.info(f"Query: {original_query} | Category: {category}")
+    safe_query = original_query.replace("\n", " ").replace("\r", " ")[:200]
+    logger.info("Query: %s | Category: %s", safe_query, category)
 
     # 2. Rewrite if ambiguous (placeholder for future enhancement)
     final_query = original_query

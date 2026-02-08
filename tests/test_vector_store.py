@@ -11,6 +11,7 @@ class TestVectorStoreInit:
     def test_defaults(self):
         vs = VectorStore()
         assert vs.index_path == "faiss_index.bin"
+        assert vs.metadata_path == "metadata.json"
         assert vs.index is None
         assert vs.metadata == []
 
@@ -26,11 +27,11 @@ class TestLoadIndex:
         vs.load_index()
         assert vs.index is None
 
-    @patch("builtins.open", mock_open(read_data=b""))
-    @patch("src.retrieval.vector_store.pickle.load", return_value=[{"doc_id": "d1"}])
+    @patch("builtins.open", mock_open(read_data='[{"doc_id": "d1"}]'))
+    @patch("src.retrieval.vector_store.json.load", return_value=[{"doc_id": "d1"}])
     @patch("src.retrieval.vector_store.faiss.read_index")
     @patch("src.retrieval.vector_store.os.path.exists", return_value=True)
-    def test_loads_existing_index(self, mock_exists, mock_read, mock_pickle):
+    def test_loads_existing_index(self, mock_exists, mock_read, mock_json):
         mock_read.return_value = MagicMock()
         vs = VectorStore()
         vs.load_index()
@@ -79,26 +80,26 @@ class TestSaveIndex:
         vs.save_index()  # should not raise
 
     @patch("src.retrieval.vector_store.faiss.write_index")
-    @patch("src.retrieval.vector_store.pickle.dump")
-    def test_saves_index_and_metadata(self, mock_pickle, mock_write):
-        vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.pkl")
+    @patch("src.retrieval.vector_store.json.dump")
+    def test_saves_index_and_metadata(self, mock_json, mock_write):
+        vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.json")
         vs.index = MagicMock()
         vs.metadata = [{"doc_id": "d1"}]
         with patch("builtins.open", mock_open()):
             vs.save_index()
         mock_write.assert_called_once_with(vs.index, "/tmp/idx.bin")
-        mock_pickle.assert_called_once()
-        assert mock_pickle.call_args[0][0] == [{"doc_id": "d1"}]
+        mock_json.assert_called_once()
+        assert mock_json.call_args[0][0] == [{"doc_id": "d1"}]
 
     @patch("src.retrieval.vector_store.faiss.write_index")
-    @patch("src.retrieval.vector_store.pickle.dump")
-    def test_saves_empty_metadata(self, mock_pickle, mock_write):
+    @patch("src.retrieval.vector_store.json.dump")
+    def test_saves_empty_metadata(self, mock_json, mock_write):
         vs = VectorStore()
         vs.index = MagicMock()
         vs.metadata = []
         with patch("builtins.open", mock_open()):
             vs.save_index()
-        assert mock_pickle.call_args[0][0] == []
+        assert mock_json.call_args[0][0] == []
 
 
 class TestSearch:

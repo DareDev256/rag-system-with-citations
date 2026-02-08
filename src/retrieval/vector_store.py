@@ -1,22 +1,22 @@
 import faiss
 import numpy as np
-import pickle
+import json
 import os
 from typing import List, Dict, Any
 
 class VectorStore:
-    def __init__(self, index_path="faiss_index.bin", metadata_path="metadata.pkl"):
+    def __init__(self, index_path="faiss_index.bin", metadata_path="metadata.json"):
         self.index_path = index_path
         self.metadata_path = metadata_path
         self.index = None
         self.metadata = []  # List of dicts corresponding to index IDs
-    
+
     def load_index(self):
         if os.path.exists(self.index_path) and os.path.exists(self.metadata_path):
             print(f"Loading index from {self.index_path}")
             self.index = faiss.read_index(self.index_path)
-            with open(self.metadata_path, "rb") as f:
-                self.metadata = pickle.load(f)
+            with open(self.metadata_path, "r", encoding="utf-8") as f:
+                self.metadata = json.load(f)
         else:
             print("No existing index found. Starting fresh.")
             self.index = None
@@ -50,8 +50,8 @@ class VectorStore:
     def save_index(self):
         if self.index:
             faiss.write_index(self.index, self.index_path)
-            with open(self.metadata_path, "wb") as f:
-                pickle.dump(self.metadata, f)
+            with open(self.metadata_path, "w", encoding="utf-8") as f:
+                json.dump(self.metadata, f, ensure_ascii=False)
             print("Index saved.")
 
     def search(self, query_vector: List[float], k: int = 3):

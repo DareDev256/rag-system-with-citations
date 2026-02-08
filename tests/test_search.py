@@ -129,7 +129,7 @@ class TestGetSearchEngine:
         get_search_engine()
         call_kwargs = mock_vs_cls.call_args[1]
         assert call_kwargs["index_path"] == "data_store/faiss.index"
-        assert call_kwargs["metadata_path"] == "data_store/meta.pkl"
+        assert call_kwargs["metadata_path"] == "data_store/meta.json"
 
 
 # ── perform_search ──────────────────────────────────────────────

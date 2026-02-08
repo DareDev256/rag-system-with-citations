@@ -5,15 +5,8 @@ __pycache__/
 .pytest_cache/
 faiss_index.bin
 embeddings.pkl
+*.pkl
 reports/
 !reports/.gitkeep
 venv/
 data_store/
-__pycache__/
-*.pyc
-.env
-.DS_Store
-.pytest_cache/
-faiss_index.bin
-embeddings.pkl
-reports/

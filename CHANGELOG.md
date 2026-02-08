@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Security
+- **Replaced `pickle` with `json`** for metadata serialization in `vector_store.py` — eliminates Remote Code Execution (RCE) risk from malicious pickle files
+- **Added security headers middleware** to FastAPI app — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-Permitted-Cross-Domain-Policies`
+- **Added CORS middleware** — opt-in via `CORS_ORIGINS` env var, locked down by default
+- **Sanitized log output** — strips newlines and truncates user queries to prevent log injection attacks
+- **Fixed Dockerfile healthcheck** — replaced `curl` (not available in `python:3.11-slim`) with `python urllib`
+- **Added `DISABLE_DOCS` env var** — allows disabling Swagger/ReDoc in production
+- **Cleaned `.gitignore`** — removed duplicate entries, added `*.pkl` glob pattern
+
 ### Fixed
 - README Testing section updated to reflect actual test coverage (142 tests across 8 suites, was incorrectly showing 64 tests across 2 suites)
 

@@ -54,7 +54,7 @@ def ingest():
     
     vector_store = VectorStore(
         index_path=os.path.join(INDEX_DIR, "faiss.index"),
-        metadata_path=os.path.join(INDEX_DIR, "meta.pkl")
+        metadata_path=os.path.join(INDEX_DIR, "meta.json")
     )
     
     # Initialize index with correct dimension

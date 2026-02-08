@@ -17,7 +17,7 @@ def get_search_engine():
             os.makedirs(base_path)
             
         index_path = os.path.join(base_path, "faiss.index")
-        meta_path = os.path.join(base_path, "meta.pkl")
+        meta_path = os.path.join(base_path, "meta.json")
         
         _vector_store = VectorStore(index_path=index_path, metadata_path=meta_path)
         _vector_store.load_index()
