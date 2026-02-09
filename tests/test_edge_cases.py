@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from src.llm.synthesize import extract_cited_doc_ids, calculate_confidence
 from src.llm.prompt import build_context_str
-from src.eval.metrics import calculate_citation_coverage
+from src.eval.metrics import calculate_citation_coverage, estimate_hallucination_rate
 from src.utils.timing import measure_latency
 from src.api.schemas import QueryRequest, Citation
 
@@ -100,14 +100,20 @@ class TestBuildContextStrEdgeCases:
 # ── calculate_citation_coverage: edge cases ──────────────────────
 
 class TestCitationCoverageEdgeCases:
-    def test_missing_doc_id_key_returns_none_via_get(self):
-        """dict.get('doc_id') returns None → checks for '[None]' in answer."""
-        assert calculate_citation_coverage("Has [None] in it.", [{"snippet": "x"}]) == 1.0
+    def test_missing_doc_id_key_skipped(self):
+        """dict.get('doc_id') returns None → skipped, not matched as '[None]'."""
+        assert calculate_citation_coverage("Has [None] in it.", [{"snippet": "x"}]) == 0.0
 
-    def test_none_doc_id_raises_typeerror(self):
-        """BUG: None doc_id crashes — `None in 'string'` raises TypeError."""
-        with pytest.raises(TypeError):
-            calculate_citation_coverage("answer", [{"doc_id": None}])
+    def test_none_doc_id_skipped_gracefully(self):
+        """Fixed: None doc_id is skipped instead of crashing."""
+        result = calculate_citation_coverage("answer", [{"doc_id": None}])
+        assert result == 0.0
+
+    def test_none_doc_id_mixed_with_valid(self):
+        """None doc_ids are skipped; valid ones still counted."""
+        citations = [{"doc_id": None}, {"doc_id": "doc_001"}]
+        result = calculate_citation_coverage("See [doc_001] here.", citations)
+        assert result == 0.5
 
     def test_empty_doc_id_checks_for_empty_brackets(self):
         assert calculate_citation_coverage("Has [] here.", [{"doc_id": ""}]) == 1.0
@@ -175,3 +181,42 @@ class TestSchemaEdgeCases:
     def test_citation_score_accepts_negative(self):
         """No validator prevents negative scores — documenting behavior."""
         assert Citation(doc_id="d", snippet="s", score=-1.0).score == -1.0
+
+
+# ── estimate_hallucination_rate: tests ───────────────────────────
+
+class TestEstimateHallucinationRate:
+    def test_fully_grounded(self):
+        """Answer words all appear in context → 0.0 hallucination."""
+        assert estimate_hallucination_rate("Python is great", "Python is great") == 0.0
+
+    def test_fully_hallucinated(self):
+        """No answer words appear in context → 1.0 hallucination."""
+        assert estimate_hallucination_rate("quantum entanglement", "Python Flask API") == 1.0
+
+    def test_partial_overlap(self):
+        """Some words grounded, some novel → between 0 and 1."""
+        rate = estimate_hallucination_rate("Python quantum computing", "Python Flask API")
+        assert 0.0 < rate < 1.0
+
+    def test_empty_answer_returns_zero(self):
+        assert estimate_hallucination_rate("", "some context") == 0.0
+
+    def test_whitespace_only_answer_returns_zero(self):
+        assert estimate_hallucination_rate("   ", "some context") == 0.0
+
+    def test_empty_context_returns_one(self):
+        """No context to ground against → all words are novel."""
+        assert estimate_hallucination_rate("hello world", "") == 1.0
+
+    def test_none_context_returns_one(self):
+        """None context treated as empty → all words novel."""
+        assert estimate_hallucination_rate("hello world", None) == 1.0
+
+    def test_stop_words_ignored(self):
+        """Stop words should not count toward overlap or novelty."""
+        rate = estimate_hallucination_rate("the is a an", "some context")
+        assert rate == 0.0  # Only stop words → nothing to measure
+
+    def test_case_insensitive(self):
+        assert estimate_hallucination_rate("PYTHON FLASK", "python flask api") == 0.0

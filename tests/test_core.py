@@ -216,8 +216,8 @@ class TestCitationCoverage:
 # ── hallucination_rate (eval metrics) ────────────────────────────
 
 class TestHallucinationRate:
-    def test_placeholder_returns_fixed_value(self):
-        assert estimate_hallucination_rate("answer", "context") == 0.1
+    def test_grounded_answer_returns_zero(self):
+        assert estimate_hallucination_rate("answer", "answer") == 0.0
 
 
 # ── load_documents (data ingestion) ─────────────────────────────

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-02-09
+
+### Fixed
+- **`calculate_citation_coverage` TypeError crash** — `None` doc_id values now skipped gracefully instead of raising `TypeError` on `None in 'string'`
+- **`estimate_hallucination_rate` placeholder replaced** — implemented word-overlap heuristic that compares answer content words against context; returns 0.0 (grounded) to 1.0 (hallucinated) instead of hardcoded 0.1
+
+### Added
+- 10 new tests for the fixed functions (1 regression + 1 mixed-validity test for coverage, 8 tests for hallucination rate)
+
 ## [1.3.0] - 2026-02-09
 
 ### Security
