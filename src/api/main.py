@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -13,12 +15,21 @@ import time
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
 
+
+@asynccontextmanager
+async def lifespan(app):
+    if not os.getenv("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
+    yield
+
+
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.2.0",
+    version="1.3.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
+    lifespan=lifespan,
 )
 
 
@@ -30,6 +41,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self'; style-src 'self'; "
+            "img-src 'self' data:; font-src 'self'; connect-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+        response.headers["Strict-Transport-Security"] = (
+            "max-age=63072000; includeSubDomains; preload"
+        )
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
@@ -44,12 +63,6 @@ if allowed_origins:
         allow_methods=["GET", "POST"],
         allow_headers=["Content-Type", "Authorization"],
     )
-
-
-@app.on_event("startup")
-async def validate_env():
-    if not os.getenv("OPENAI_API_KEY"):
-        raise RuntimeError("OPENAI_API_KEY environment variable is not set")
 
 
 @app.get("/health")

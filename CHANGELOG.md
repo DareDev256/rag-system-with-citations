@@ -2,7 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [1.3.0] - 2026-02-09
+
+### Security
+- **Added `Content-Security-Policy` header** — restricts script/style/image sources to `'self'`, blocks framing via `frame-ancestors 'none'`
+- **Added `Strict-Transport-Security` header** — enforces HTTPS with 2-year max-age, includeSubDomains, and preload
+- **Dockerfile runs as non-root user** — creates dedicated `appuser` to limit blast radius of container compromise
+- **Added `.dockerignore`** — prevents `.env`, `.git`, tests, `__pycache__`, and data artifacts from leaking into Docker image
+- **Removed unused dependencies** — dropped `requests` and `click` from requirements.txt (never imported, unnecessary attack surface)
+
+### Changed
+- **Migrated `@app.on_event("startup")` to `lifespan` context manager** — replaces deprecated FastAPI pattern, aligns with modern FastAPI lifecycle management
+
+## [1.2.0] - 2026-02-08
 
 ### Security
 - **Replaced `pickle` with `json`** for metadata serialization in `vector_store.py` — eliminates Remote Code Execution (RCE) risk from malicious pickle files

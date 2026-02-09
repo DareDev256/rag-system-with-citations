@@ -7,33 +7,36 @@ from unittest.mock import patch, MagicMock, call
 import pytest
 
 # ---------------------------------------------------------------------------
-# validate_env — FastAPI startup event
+# lifespan — FastAPI startup validation via lifespan context manager
 # ---------------------------------------------------------------------------
 
 
-class TestValidateEnv:
+class TestLifespan:
     @pytest.mark.asyncio
     async def test_raises_when_key_missing(self):
-        from src.api.main import validate_env
+        from src.api.main import lifespan, app
 
         with patch("src.api.main.os.getenv", return_value=None):
             with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
-                await validate_env()
+                async with lifespan(app):
+                    pass
 
     @pytest.mark.asyncio
     async def test_passes_when_key_set(self):
-        from src.api.main import validate_env
+        from src.api.main import lifespan, app
 
         with patch("src.api.main.os.getenv", return_value="sk-test-123"):
-            await validate_env()  # should not raise
+            async with lifespan(app):
+                pass  # should not raise
 
     @pytest.mark.asyncio
     async def test_raises_on_empty_string(self):
-        from src.api.main import validate_env
+        from src.api.main import lifespan, app
 
         with patch("src.api.main.os.getenv", return_value=""):
             with pytest.raises(RuntimeError):
-                await validate_env()
+                async with lifespan(app):
+                    pass
 
 
 # ---------------------------------------------------------------------------
