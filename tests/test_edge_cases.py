@@ -110,10 +110,10 @@ class TestCitationCoverageEdgeCases:
         assert result == 0.0
 
     def test_none_doc_id_mixed_with_valid(self):
-        """None doc_ids are skipped; valid ones still counted."""
+        """None doc_ids excluded from denominator; coverage based on valid only."""
         citations = [{"doc_id": None}, {"doc_id": "doc_001"}]
         result = calculate_citation_coverage("See [doc_001] here.", citations)
-        assert result == 0.5
+        assert result == 1.0  # 1 valid cited / 1 valid total
 
     def test_empty_doc_id_checks_for_empty_brackets(self):
         assert calculate_citation_coverage("Has [] here.", [{"doc_id": ""}]) == 1.0

@@ -64,12 +64,12 @@ class TestClassifyQuery:
         assert classify_query("What is X?") == "factual"
 
     @patch("src.llm.synthesize.get_llm_client")
-    def test_api_error_defaults_to_factual(self, mock_get):
+    def test_api_error_defaults_to_exploratory(self, mock_get):
         client = MagicMock()
         client.chat.completions.create.side_effect = Exception("API down")
         mock_get.return_value = client
 
-        assert classify_query("What is X?") == "factual"
+        assert classify_query("What is X?") == "exploratory"
 
     @patch("src.llm.synthesize.get_llm_client")
     def test_calls_openai_with_correct_model(self, mock_get):

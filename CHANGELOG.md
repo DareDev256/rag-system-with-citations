@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.2] - 2026-02-19
+
+### Fixed
+- **`calculate_citation_coverage` denominator bug** — None doc_ids no longer inflate the denominator, fixing under-reported coverage when metadata is incomplete
+- **Format string injection in LLM prompts** — replaced `str.format()` with safe `str.replace()` so user queries containing `{context_str}` or `{query}` no longer cause `KeyError` crashes
+- **`classify_query` inconsistent error fallback** — API errors now return `"exploratory"` (safe default) instead of `"factual"`, matching the out-of-vocab fallback behavior
+- **`ingest.py` TOCTOU race** — replaced `os.path.exists()` + `os.makedirs()` with atomic `os.makedirs(exist_ok=True)`
+- **`ingest.py` single-file abort** — bad corpus files (permission denied, encoding errors) are now skipped with a warning instead of aborting the entire ingest
+
 ## [1.3.1] - 2026-02-09
 
 ### Fixed

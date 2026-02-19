@@ -15,29 +15,32 @@ def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
         
     for filepath in glob.glob(os.path.join(corpus_dir, "*.txt")):
         filename = os.path.basename(filepath)
-        with open(filepath, "r", encoding="utf-8") as f:
-            text = f.read()
-            # Simple chunking by paragraph or fixed size could go here.
-            # For this demo, treating each file or paragraph as a doc.
-            # Let's split by double newline to get paragraphs.
-            paragraphs = text.split("\n\n")
-            for i, p in enumerate(paragraphs):
-                p = p.strip()
-                if not p:
-                    continue
-                docs.append({
-                    "doc_id": f"{filename}_{i}",
-                    "text": p,
-                    "source": filename
-                })
+        try:
+            with open(filepath, "r", encoding="utf-8") as f:
+                text = f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            print(f"Warning: skipping {filename}: {e}")
+            continue
+        # Simple chunking by paragraph or fixed size could go here.
+        # For this demo, treating each file or paragraph as a doc.
+        # Let's split by double newline to get paragraphs.
+        paragraphs = text.split("\n\n")
+        for i, p in enumerate(paragraphs):
+            p = p.strip()
+            if not p:
+                continue
+            docs.append({
+                "doc_id": f"{filename}_{i}",
+                "text": p,
+                "source": filename
+            })
     return docs
 
 def ingest():
     print("Starting ingestion...")
     
     # Ensure index dir exists
-    if not os.path.exists(INDEX_DIR):
-        os.makedirs(INDEX_DIR)
+    os.makedirs(INDEX_DIR, exist_ok=True)
         
     docs = load_documents(CORPUS_DIR)
     print(f"Loaded {len(docs)} documents/chunks.")

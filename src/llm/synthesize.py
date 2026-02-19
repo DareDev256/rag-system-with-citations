@@ -2,7 +2,7 @@ import os
 import re
 import openai
 from typing import List, Dict, Any, Set
-from src.llm.prompt import RAG_PROMPT_TEMPLATE, CLASSIFICATION_PROMPT_TEMPLATE, build_context_str
+from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
 from src.utils.timing import measure_latency
 
 # Configuration from environment
@@ -99,7 +99,7 @@ def classify_query(query: str) -> str:
             model=CLASSIFICATION_MODEL,
             messages=[
                 {"role": "system", "content": "You are a precise classifier."},
-                {"role": "user", "content": CLASSIFICATION_PROMPT_TEMPLATE.format(query=query)}
+                {"role": "user", "content": format_classification_prompt(query)}
             ],
             temperature=0,
             max_tokens=10
@@ -110,7 +110,7 @@ def classify_query(query: str) -> str:
         return category
     except Exception as e:
         print(f"Classification error: {e}")
-        return "factual"
+        return "exploratory"
 
 
 @measure_latency
@@ -118,7 +118,7 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     client = get_llm_client()
 
     context_str = build_context_str(search_results)
-    prompt = RAG_PROMPT_TEMPLATE.format(context_str=context_str, query=query)
+    prompt = format_rag_prompt(context_str, query)
 
     try:
         response = client.chat.completions.create(
@@ -174,7 +174,7 @@ async def classify_query_async(query: str) -> str:
             model=CLASSIFICATION_MODEL,
             messages=[
                 {"role": "system", "content": "You are a precise classifier."},
-                {"role": "user", "content": CLASSIFICATION_PROMPT_TEMPLATE.format(query=query)}
+                {"role": "user", "content": format_classification_prompt(query)}
             ],
             temperature=0,
             max_tokens=10
@@ -185,7 +185,7 @@ async def classify_query_async(query: str) -> str:
         return category
     except Exception as e:
         print(f"Classification error: {e}")
-        return "factual"
+        return "exploratory"
 
 
 async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dict[str, Any]:
@@ -193,7 +193,7 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
     client = get_async_llm_client()
 
     context_str = build_context_str(search_results)
-    prompt = RAG_PROMPT_TEMPLATE.format(context_str=context_str, query=query)
+    prompt = format_rag_prompt(context_str, query)
 
     try:
         response = await client.chat.completions.create(

@@ -63,9 +63,9 @@ class TestClassifyQueryAsync:
 
     @pytest.mark.asyncio
     @patch("src.llm.synthesize.get_async_llm_client")
-    async def test_api_error_defaults_to_factual(self, mock_get):
+    async def test_api_error_defaults_to_exploratory(self, mock_get):
         mock_get.return_value = _mock_async_client(side_effect=Exception("API down"))
-        assert await classify_query_async("What is X?") == "factual"
+        assert await classify_query_async("What is X?") == "exploratory"
 
     @pytest.mark.asyncio
     @patch("src.llm.synthesize.get_async_llm_client")

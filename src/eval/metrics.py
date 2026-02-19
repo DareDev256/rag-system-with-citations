@@ -20,15 +20,19 @@ def calculate_citation_coverage(answer: str, citations: List[Dict]) -> float:
         return 0.0
 
     used_count = 0
+    valid_count = 0
     for cit in citations:
         doc_id = cit.get("doc_id")
         if doc_id is None:
             continue
+        valid_count += 1
         # Check for [doc_id] or just the id if prompt format varies
         if f"[{doc_id}]" in answer or doc_id in answer:
             used_count += 1
 
-    return used_count / len(citations)
+    if valid_count == 0:
+        return 0.0
+    return used_count / valid_count
 
 
 def estimate_hallucination_rate(answer: str, context_str: str) -> float:

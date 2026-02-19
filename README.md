@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-142 tests across 8 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, and integration tests:
+186 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
 
 ```bash
 pytest tests/ -v

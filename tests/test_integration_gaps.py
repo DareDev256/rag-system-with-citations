@@ -49,8 +49,7 @@ class TestIngest:
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
     @patch("src.data.ingest.os.makedirs")
-    @patch("src.data.ingest.os.path.exists", return_value=False)
-    def test_full_pipeline(self, mock_exists, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_full_pipeline(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
         from src.data.ingest import ingest
 
         mock_load.return_value = [
@@ -73,19 +72,17 @@ class TestIngest:
 
     @patch("src.data.ingest.load_documents", return_value=[])
     @patch("src.data.ingest.os.makedirs")
-    @patch("src.data.ingest.os.path.exists", return_value=True)
-    def test_no_documents_exits_early(self, mock_exists, mock_makedirs, mock_load):
+    def test_no_documents_exits_early(self, mock_makedirs, mock_load):
         from src.data.ingest import ingest
 
         ingest()  # should not raise
-        mock_makedirs.assert_not_called()  # dir already exists
+        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
 
     @patch("src.data.ingest.VectorStore")
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
     @patch("src.data.ingest.os.makedirs")
-    @patch("src.data.ingest.os.path.exists", return_value=False)
-    def test_creates_index_dir_when_missing(self, mock_exists, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_creates_index_dir_atomically(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
         from src.data.ingest import ingest
 
         mock_load.return_value = [{"doc_id": "a_0", "text": "content", "source": "a.txt"}]
@@ -95,14 +92,13 @@ class TestIngest:
         mock_vs_cls.return_value = MagicMock()
 
         ingest()
-        mock_makedirs.assert_called_once_with("data_store")
+        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
 
     @patch("src.data.ingest.VectorStore")
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
     @patch("src.data.ingest.os.makedirs")
-    @patch("src.data.ingest.os.path.exists", return_value=True)
-    def test_multiple_documents(self, mock_exists, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_multiple_documents(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
         from src.data.ingest import ingest
 
         mock_load.return_value = [
