@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-186 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
+189 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -156,7 +156,7 @@ pytest tests/ -v
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
 | `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
-| `test_search.py` | 14 | `Embedder` singleton behavior, `get_search_engine` factory, `perform_search` orchestration |
+| `test_search.py` | 17 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
 | `test_integration_gaps.py` | 13 | Environment validation, ingest pipeline, LLM client factory functions (sync + async) |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
@@ -171,6 +171,7 @@ Set via environment variables or `.env`:
 | `OPENAI_API_KEY` | — | Required. Your OpenAI API key |
 | `SYNTHESIS_MODEL` | `gpt-4o-mini` | Model for answer generation |
 | `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Model for query classification |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers model for embeddings |
 
 ## Docker
 

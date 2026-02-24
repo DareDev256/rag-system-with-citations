@@ -76,6 +76,38 @@ class TestEmbedderSingleton:
         b = get_embedder()
         assert a is b
 
+    @patch("src.retrieval.embed.SentenceTransformer", side_effect=OSError("model not found"))
+    def test_model_load_failure_does_not_poison_singleton(self, mock_st):
+        """If SentenceTransformer raises, singleton must NOT be set."""
+        with pytest.raises(OSError, match="model not found"):
+            Embedder()
+        # Singleton must remain None so a retry can succeed
+        assert Embedder._instance is None
+
+    @patch("src.retrieval.embed.SentenceTransformer")
+    def test_retry_after_failure_succeeds(self, mock_st):
+        """After a failed load, a second attempt with a working model should succeed."""
+        mock_st.side_effect = [RuntimeError("transient"), MagicMock()]
+        with pytest.raises(RuntimeError):
+            Embedder()
+        assert Embedder._instance is None
+        # Second attempt succeeds
+        emb = Embedder()
+        assert emb.model is not None
+        assert Embedder._instance is emb
+
+    @patch("src.retrieval.embed.SentenceTransformer")
+    def test_uses_embedding_model_env_var(self, mock_st):
+        """Embedder should use the EMBEDDING_MODEL module constant."""
+        from src.retrieval import embed
+        original = embed.EMBEDDING_MODEL
+        try:
+            embed.EMBEDDING_MODEL = "test-model-name"
+            Embedder()
+            mock_st.assert_called_once_with("test-model-name")
+        finally:
+            embed.EMBEDDING_MODEL = original
+
 
 # ── get_search_engine ───────────────────────────────────────────
 

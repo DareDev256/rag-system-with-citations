@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.3] - 2026-02-23
+
+### Fixed
+- **Embedder singleton poisoning on model load failure** — if `SentenceTransformer()` raises (network error, OOM, missing model), the singleton is no longer left in a broken state; subsequent retries work correctly
+- **Pinned `sentence-transformers` upper bound** — added `<4.0.0` cap to prevent silent breaking changes from floating `>=2.2.2`
+
+### Added
+- **Configurable embedding model** — `EMBEDDING_MODEL` env var lets you swap models without code changes (default: `all-MiniLM-L6-v2`)
+- 3 new tests for singleton failure recovery, retry behavior, and model name configuration (189 total)
+
 ## [1.3.2] - 2026-02-19
 
 ### Fixed

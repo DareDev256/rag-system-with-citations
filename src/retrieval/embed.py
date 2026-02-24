@@ -1,24 +1,33 @@
 from sentence_transformers import SentenceTransformer
 from typing import List
+import logging
 import os
+
+logger = logging.getLogger(__name__)
+
+EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "all-MiniLM-L6-v2")
+
 
 class Embedder:
     _instance = None
-    
+
     def __new__(cls):
         if cls._instance is None:
-            cls._instance = super(Embedder, cls).__new__(cls)
-            # Load model once. Using the lightweight all-MiniLM-L6-v2
-            # Set cache folder if needed, or rely on default
-            print("Loading embedding model...")
-            cls._instance.model = SentenceTransformer('all-MiniLM-L6-v2')
-            print("Embedding model loaded.")
+            instance = super(Embedder, cls).__new__(cls)
+            logger.info("Loading embedding model: %s", EMBEDDING_MODEL)
+            try:
+                instance.model = SentenceTransformer(EMBEDDING_MODEL)
+            except Exception:
+                logger.exception("Failed to load embedding model: %s", EMBEDDING_MODEL)
+                raise
+            cls._instance = instance
+            logger.info("Embedding model loaded.")
         return cls._instance
 
     def encode(self, texts: List[str]) -> List[List[float]]:
-        # Returns a list of vectors (list of floats)
         embeddings = self.model.encode(texts, convert_to_numpy=True)
         return embeddings.tolist()
+
 
 # Global accessor
 def get_embedder():
