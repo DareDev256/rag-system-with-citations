@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-189 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
+190 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -157,7 +157,7 @@ pytest tests/ -v
 | `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
 | `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
 | `test_search.py` | 17 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
-| `test_integration_gaps.py` | 13 | Environment validation, ingest pipeline, LLM client factory functions (sync + async) |
+| `test_integration_gaps.py` | 14 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
@@ -168,10 +168,23 @@ Set via environment variables or `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | — | Required. Your OpenAI API key |
+| `OPENAI_API_KEY` | — | Required. Your OpenAI API key (or proxy key) |
+| `OPENAI_BASE_URL` | — | Optional. Route LLM calls through any OpenAI-compatible proxy |
 | `SYNTHESIS_MODEL` | `gpt-4o-mini` | Model for answer generation |
 | `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Model for query classification |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers model for embeddings |
+
+### Using Alternative LLM Providers
+
+Any OpenAI-compatible proxy works as a drop-in backend — Anthropic (via LiteLLM), Qwen (via vLLM), local models (via Ollama):
+
+```bash
+# Example: route through LiteLLM to use Claude
+export OPENAI_BASE_URL=http://localhost:4000/v1
+export SYNTHESIS_MODEL=claude-sonnet-4-20250514
+```
+
+See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup guides (LiteLLM, OpenRouter, Ollama, vLLM).
 
 ## Docker
 

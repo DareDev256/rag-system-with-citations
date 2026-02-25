@@ -15,23 +15,37 @@ _llm_client = None
 _async_llm_client = None
 
 
+def _client_kwargs() -> dict:
+    """Build shared kwargs for OpenAI client initialization.
+
+    Supports OPENAI_BASE_URL for proxy compatibility — any OpenAI-compatible
+    proxy (LiteLLM, OpenRouter, enterprise gateways) works by setting this
+    env var alongside OPENAI_API_KEY.
+    """
+    kwargs = {}
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        print("Warning: OPENAI_API_KEY not found in env.")
+    kwargs["api_key"] = api_key
+
+    base_url = os.getenv("OPENAI_BASE_URL")
+    if base_url:
+        kwargs["base_url"] = base_url
+
+    return kwargs
+
+
 def get_llm_client():
     global _llm_client
     if _llm_client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            print("Warning: OPENAI_API_KEY not found in env.")
-        _llm_client = openai.OpenAI(api_key=api_key)
+        _llm_client = openai.OpenAI(**_client_kwargs())
     return _llm_client
 
 
 def get_async_llm_client():
     global _async_llm_client
     if _async_llm_client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            print("Warning: OPENAI_API_KEY not found in env.")
-        _async_llm_client = openai.AsyncOpenAI(api_key=api_key)
+        _async_llm_client = openai.AsyncOpenAI(**_client_kwargs())
     return _async_llm_client
 
 

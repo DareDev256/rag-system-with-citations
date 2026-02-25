@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.4] - 2026-02-25
+
+### Added
+- **`OPENAI_BASE_URL` env var support** — route all LLM calls through any OpenAI-compatible proxy (LiteLLM, OpenRouter, Ollama, vLLM) to use Anthropic, Qwen, Mistral, or local models as drop-in backends
+- **Proxy integration guide** (`docs/proxy-integration.md`) — configuration examples for LiteLLM, OpenRouter, Ollama, and vLLM with model selection tips
+- **`_client_kwargs()` helper** in `synthesize.py` — centralizes client config (API key + base URL) shared by sync and async clients, replacing duplicated setup logic
+
 ## [1.3.3] - 2026-02-23
 
 ### Fixed

@@ -132,7 +132,7 @@ class TestGetLlmClient:
         mod._async_llm_client = None
 
     @patch("src.llm.synthesize.openai.OpenAI")
-    @patch("src.llm.synthesize.os.getenv", return_value="sk-test")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test"}.get(k))
     def test_creates_client_with_key(self, mock_env, mock_openai):
         from src.llm.synthesize import get_llm_client
 
@@ -141,7 +141,7 @@ class TestGetLlmClient:
         assert client is mock_openai.return_value
 
     @patch("src.llm.synthesize.openai.OpenAI")
-    @patch("src.llm.synthesize.os.getenv", return_value="sk-test")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test"}.get(k))
     def test_caches_client(self, mock_env, mock_openai):
         from src.llm.synthesize import get_llm_client
 
@@ -149,6 +149,14 @@ class TestGetLlmClient:
         c2 = get_llm_client()
         assert c1 is c2
         mock_openai.assert_called_once()  # only created once
+
+    @patch("src.llm.synthesize.openai.OpenAI")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": "http://proxy:4000/v1"}.get(k))
+    def test_creates_client_with_base_url(self, mock_env, mock_openai):
+        from src.llm.synthesize import get_llm_client
+
+        get_llm_client()
+        mock_openai.assert_called_once_with(api_key="sk-test", base_url="http://proxy:4000/v1")
 
     @patch("src.llm.synthesize.openai.OpenAI")
     @patch("src.llm.synthesize.os.getenv", return_value=None)
@@ -167,7 +175,7 @@ class TestGetAsyncLlmClient:
         mod._async_llm_client = None
 
     @patch("src.llm.synthesize.openai.AsyncOpenAI")
-    @patch("src.llm.synthesize.os.getenv", return_value="sk-async")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-async"}.get(k))
     def test_creates_async_client(self, mock_env, mock_async):
         from src.llm.synthesize import get_async_llm_client
 
@@ -176,7 +184,7 @@ class TestGetAsyncLlmClient:
         assert client is mock_async.return_value
 
     @patch("src.llm.synthesize.openai.AsyncOpenAI")
-    @patch("src.llm.synthesize.os.getenv", return_value="sk-async")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-async"}.get(k))
     def test_caches_async_client(self, mock_env, mock_async):
         from src.llm.synthesize import get_async_llm_client
 
