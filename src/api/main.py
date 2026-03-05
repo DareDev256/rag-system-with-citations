@@ -26,11 +26,30 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.3.5",
+    version="1.3.6",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
 )
+
+
+# Default CSP — override via CSP_POLICY env var for proxied/Swagger environments
+_DEFAULT_CSP = (
+    "default-src 'self'; "
+    "script-src 'self'; "
+    "style-src 'self'; "
+    "img-src 'self' data:; "
+    "font-src 'self'; "
+    "connect-src 'self'; "
+    "object-src 'none'; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "frame-ancestors 'none'; "
+    "upgrade-insecure-requests"
+)
+
+# HSTS max-age in seconds (default 2 years), override via HSTS_MAX_AGE env var
+_HSTS_MAX_AGE = int(os.getenv("HSTS_MAX_AGE", "63072000"))
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -38,16 +57,14 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response: Response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-DNS-Prefetch-Control"] = "off"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-        response.headers["Content-Security-Policy"] = (
-            "default-src 'self'; script-src 'self'; style-src 'self'; "
-            "img-src 'self' data:; font-src 'self'; connect-src 'self'; "
-            "frame-ancestors 'none'"
-        )
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Content-Security-Policy"] = os.getenv("CSP_POLICY", _DEFAULT_CSP)
         response.headers["Strict-Transport-Security"] = (
-            "max-age=63072000; includeSubDomains; preload"
+            f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"
         )
         return response
 

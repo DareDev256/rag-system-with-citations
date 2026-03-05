@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.6] - 2026-03-05
+
+### Security
+- **Hardened CSP with 4 new directives** — `object-src 'none'` (blocks plugin exploits), `base-uri 'self'` (prevents base tag injection), `form-action 'self'` (blocks cross-origin form submissions), `upgrade-insecure-requests` (auto HTTP→HTTPS)
+- **Added `Cache-Control: no-store`** — prevents browsers and proxies from caching sensitive API response data
+- **Added `X-DNS-Prefetch-Control: off`** — prevents DNS prefetching information leakage
+- **CSP now configurable via `CSP_POLICY` env var** — allows override for environments requiring Swagger UI (`unsafe-inline`) or custom policies
+- **HSTS max-age configurable via `HSTS_MAX_AGE` env var** — defaults to 2 years (63072000s)
+
+### Added
+- 7 new hardening tests: `object-src`, `base-uri`, `form-action`, `upgrade-insecure-requests`, CSP env override, DNS prefetch control, cache-control (219 total)
+
 ## [1.3.5] - 2026-03-05
 
 ### Added

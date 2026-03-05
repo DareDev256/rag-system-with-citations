@@ -20,9 +20,19 @@ from src.data.ingest import load_documents
 # ── Security Headers Middleware ──────────────────────────────────
 
 
+_real_getenv = os.getenv
+
+
+def _mock_getenv(key, *args, **kwargs):
+    """Only fake OPENAI_API_KEY; let all other env vars pass through."""
+    if key == "OPENAI_API_KEY":
+        return "fake-key"
+    return _real_getenv(key, *args, **kwargs)
+
+
 @pytest.fixture(autouse=True)
 def _skip_env_validation():
-    with patch("src.api.main.os.getenv", return_value="fake-key"):
+    with patch("src.api.main.os.getenv", side_effect=_mock_getenv):
         yield
 
 
@@ -58,6 +68,32 @@ class TestSecurityHeaders:
         assert "default-src 'self'" in csp
         assert "frame-ancestors 'none'" in csp
 
+    def test_csp_blocks_object_src(self, client):
+        """object-src 'none' blocks Flash/Java plugin exploits."""
+        csp = client.get("/health").headers["Content-Security-Policy"]
+        assert "object-src 'none'" in csp
+
+    def test_csp_restricts_base_uri(self, client):
+        """base-uri 'self' prevents <base> tag injection attacks."""
+        csp = client.get("/health").headers["Content-Security-Policy"]
+        assert "base-uri 'self'" in csp
+
+    def test_csp_restricts_form_action(self, client):
+        """form-action 'self' blocks cross-origin form submissions."""
+        csp = client.get("/health").headers["Content-Security-Policy"]
+        assert "form-action 'self'" in csp
+
+    def test_csp_upgrade_insecure(self, client):
+        """upgrade-insecure-requests auto-upgrades HTTP to HTTPS."""
+        csp = client.get("/health").headers["Content-Security-Policy"]
+        assert "upgrade-insecure-requests" in csp
+
+    @patch.dict(os.environ, {"CSP_POLICY": "default-src 'none'"})
+    def test_csp_custom_override(self, client):
+        """CSP_POLICY env var overrides the default policy."""
+        csp = client.get("/health").headers["Content-Security-Policy"]
+        assert csp == "default-src 'none'"
+
     def test_hsts_header(self, client):
         resp = client.get("/health")
         hsts = resp.headers["Strict-Transport-Security"]
@@ -68,6 +104,14 @@ class TestSecurityHeaders:
     def test_cross_domain_policies(self, client):
         resp = client.get("/health")
         assert resp.headers["X-Permitted-Cross-Domain-Policies"] == "none"
+
+    def test_dns_prefetch_control(self, client):
+        """X-DNS-Prefetch-Control prevents DNS prefetching data leaks."""
+        assert client.get("/health").headers["X-DNS-Prefetch-Control"] == "off"
+
+    def test_cache_control_no_store(self, client):
+        """API responses must not be cached (sensitive query data)."""
+        assert client.get("/health").headers["Cache-Control"] == "no-store"
 
     def test_headers_present_on_error_responses(self, client):
         """Security headers must appear even on 422 validation errors."""
