@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.5] - 2026-03-05
+
+### Added
+- **22 hardening tests** (`test_hardening.py`) covering 4 previously untested areas:
+  - **Security headers** (9 tests): verifies all 7 security headers (CSP, HSTS, X-Frame-Options, etc.) on health, query, and error responses
+  - **Prompt injection resistance** (5 tests): proves safe `.replace()` templates handle `{curly_braces}`, `%(percent)s`, and template variable names in user input
+  - **File I/O error resilience** (4 tests): exercises encoding errors, permission denied, empty files, and mixed bad/good files in `load_documents`
+  - **`_client_kwargs` configuration** (4 tests): validates OpenAI client config building — key-only, key+base_url, missing key, empty base_url
+- Total test count: 212 across 10 test suites
+
 ## [1.3.4] - 2026-02-25
 
 ### Added

@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-190 tests across 9 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, and integration tests:
+212 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -152,6 +152,8 @@ pytest tests/ -v
 | Suite | Tests | Coverage |
 |-------|-------|----------|
 | `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
+| `test_edge_cases.py` | 44 | Unicode, missing keys, boundary values, exception propagation, type coercion, hallucination rate |
+| `test_hardening.py` | 22 | Security headers on all response types, prompt injection resistance, file I/O error resilience, `_client_kwargs` config |
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
