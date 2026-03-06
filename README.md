@@ -47,7 +47,7 @@ src/
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls, citation extraction, confidence scoring
+│   └── synthesize.py    # LLM calls (sync + async), citation extraction, confidence scoring
 ├── retrieval/
 │   ├── embed.py         # Sentence Transformers embedder (singleton)
 │   ├── search.py        # Search orchestration layer

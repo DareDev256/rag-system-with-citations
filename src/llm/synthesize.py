@@ -111,23 +111,65 @@ def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set
     return round(confidence, 2)
 
 
+# ─── Shared post-processing helpers (sync/async DRY) ────────────────
+
+_VALID_CATEGORIES = {"factual", "exploratory", "ambiguous"}
+
+_CLASSIFICATION_MESSAGES = lambda query: [
+    {"role": "system", "content": "You are a precise classifier."},
+    {"role": "user", "content": format_classification_prompt(query)},
+]
+
+_SYNTHESIS_MESSAGES = lambda prompt: [
+    {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
+    {"role": "user", "content": prompt},
+]
+
+
+def _parse_classification(response) -> str:
+    """Parse LLM classification response into a valid category."""
+    category = response.choices[0].message.content.strip().lower()
+    return category if category in _VALID_CATEGORIES else "exploratory"
+
+
+def _parse_synthesis(response, search_results: List[Dict]) -> Dict[str, Any]:
+    """Parse LLM synthesis response into answer dict with citations and confidence."""
+    answer = response.choices[0].message.content.strip()
+
+    available_ids = {res["doc_id"] for res in search_results}
+    cited_ids = extract_cited_doc_ids(answer, available_ids)
+
+    citations_used = [res for res in search_results if res["doc_id"] in cited_ids]
+
+    # Fallback: include top result when LLM doesn't follow citation format
+    if not citations_used and search_results:
+        citations_used = search_results[:1]
+
+    confidence = calculate_confidence(answer, search_results, cited_ids)
+
+    return {
+        "answer": answer,
+        "citations_used": citations_used,
+        "confidence": confidence,
+    }
+
+
+_SYNTHESIS_ERROR = {"answer": "Error generating answer.", "citations_used": [], "confidence": 0.0}
+
+
+# ─── Sync API ────────────────────────────────────────────────────────
+
 @measure_latency
 def classify_query(query: str) -> str:
     client = get_llm_client()
     try:
         response = client.chat.completions.create(
             model=CLASSIFICATION_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a precise classifier."},
-                {"role": "user", "content": format_classification_prompt(query)}
-            ],
+            messages=_CLASSIFICATION_MESSAGES(query),
             temperature=0,
-            max_tokens=10
+            max_tokens=10,
         )
-        category = response.choices[0].message.content.strip().lower()
-        if category not in ["factual", "exploratory", "ambiguous"]:
-            return "exploratory"
-        return category
+        return _parse_classification(response)
     except Exception as e:
         logger.error("Classification failed: %s", type(e).__name__)
         return "exploratory"
@@ -136,55 +178,22 @@ def classify_query(query: str) -> str:
 @measure_latency
 def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     client = get_llm_client()
-
-    context_str = build_context_str(search_results)
-    prompt = format_rag_prompt(context_str, query)
+    prompt = format_rag_prompt(build_context_str(search_results), query)
 
     try:
         response = client.chat.completions.create(
             model=SYNTHESIS_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=_SYNTHESIS_MESSAGES(prompt),
             temperature=0.0,
-            max_tokens=500
+            max_tokens=500,
         )
-        answer = response.choices[0].message.content.strip()
-
-        # Parse citations from the answer, validating against available doc IDs
-        available_ids = {res["doc_id"] for res in search_results}
-        cited_ids = extract_cited_doc_ids(answer, available_ids)
-
-        # Filter to only actually cited sources
-        citations_used = [
-            res for res in search_results
-            if res["doc_id"] in cited_ids
-        ]
-
-        # If no citations were parsed but we have results, include top result
-        # (fallback for when LLM doesn't follow citation format)
-        if not citations_used and search_results:
-            citations_used = search_results[:1]
-
-        # Calculate real confidence score
-        confidence = calculate_confidence(answer, search_results, cited_ids)
-
-        return {
-            "answer": answer,
-            "citations_used": citations_used,
-            "confidence": confidence
-        }
+        return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Synthesis failed: %s", type(e).__name__)
-        return {
-            "answer": "Error generating answer.",
-            "citations_used": [],
-            "confidence": 0.0
-        }
+        return dict(_SYNTHESIS_ERROR)
 
 
-# ============= ASYNC VERSIONS =============
+# ─── Async API ───────────────────────────────────────────────────────
 
 async def classify_query_async(query: str) -> str:
     """Async version of classify_query for non-blocking API calls."""
@@ -192,17 +201,11 @@ async def classify_query_async(query: str) -> str:
     try:
         response = await client.chat.completions.create(
             model=CLASSIFICATION_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a precise classifier."},
-                {"role": "user", "content": format_classification_prompt(query)}
-            ],
+            messages=_CLASSIFICATION_MESSAGES(query),
             temperature=0,
-            max_tokens=10
+            max_tokens=10,
         )
-        category = response.choices[0].message.content.strip().lower()
-        if category not in ["factual", "exploratory", "ambiguous"]:
-            return "exploratory"
-        return category
+        return _parse_classification(response)
     except Exception as e:
         logger.error("Async classification failed: %s", type(e).__name__)
         return "exploratory"
@@ -211,48 +214,16 @@ async def classify_query_async(query: str) -> str:
 async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     """Async version of synthesize_answer for non-blocking API calls."""
     client = get_async_llm_client()
-
-    context_str = build_context_str(search_results)
-    prompt = format_rag_prompt(context_str, query)
+    prompt = format_rag_prompt(build_context_str(search_results), query)
 
     try:
         response = await client.chat.completions.create(
             model=SYNTHESIS_MODEL,
-            messages=[
-                {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
-                {"role": "user", "content": prompt}
-            ],
+            messages=_SYNTHESIS_MESSAGES(prompt),
             temperature=0.0,
-            max_tokens=500
+            max_tokens=500,
         )
-        answer = response.choices[0].message.content.strip()
-
-        # Parse citations from the answer, validating against available doc IDs
-        available_ids = {res["doc_id"] for res in search_results}
-        cited_ids = extract_cited_doc_ids(answer, available_ids)
-
-        # Filter to only actually cited sources
-        citations_used = [
-            res for res in search_results
-            if res["doc_id"] in cited_ids
-        ]
-
-        # Fallback if no citations parsed
-        if not citations_used and search_results:
-            citations_used = search_results[:1]
-
-        # Calculate real confidence score
-        confidence = calculate_confidence(answer, search_results, cited_ids)
-
-        return {
-            "answer": answer,
-            "citations_used": citations_used,
-            "confidence": confidence
-        }
+        return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Async synthesis failed: %s", type(e).__name__)
-        return {
-            "answer": "Error generating answer.",
-            "citations_used": [],
-            "confidence": 0.0
-        }
+        return dict(_SYNTHESIS_ERROR)

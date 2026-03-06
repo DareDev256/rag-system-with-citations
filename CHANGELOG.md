@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-03-06
+
+### Changed
+- **Refactored `synthesize.py` to eliminate sync/async duplication** — extracted `_parse_classification()`, `_parse_synthesis()`, and `_SYNTHESIS_ERROR` as shared helpers; sync and async variants are now thin wrappers around the same parsing logic, reducing the file from 259 to 197 lines and ensuring future changes to response handling only need to be made once
+
 ## [1.3.7] - 2026-03-05
 
 ### Security
