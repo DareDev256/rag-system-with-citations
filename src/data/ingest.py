@@ -12,9 +12,15 @@ def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
     if not os.path.exists(corpus_dir):
         print(f"Corpus directory {corpus_dir} does not exist.")
         return docs
-        
+
+    # Path traversal guard — resolve symlinks and verify canonical path
+    real_corpus = os.path.realpath(corpus_dir)
     for filepath in glob.glob(os.path.join(corpus_dir, "*.txt")):
-        filename = os.path.basename(filepath)
+        real_file = os.path.realpath(filepath)
+        if not real_file.startswith(real_corpus + os.sep) and real_file != real_corpus:
+            print(f"Warning: skipping {filepath}: path traversal detected")
+            continue
+        filename = os.path.basename(real_file)
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 text = f.read()

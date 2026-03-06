@@ -137,7 +137,7 @@ class TestGetLlmClient:
         from src.llm.synthesize import get_llm_client
 
         client = get_llm_client()
-        mock_openai.assert_called_once_with(api_key="sk-test")
+        mock_openai.assert_called_once_with(api_key="sk-test", timeout=30)
         assert client is mock_openai.return_value
 
     @patch("src.llm.synthesize.openai.OpenAI")
@@ -156,7 +156,7 @@ class TestGetLlmClient:
         from src.llm.synthesize import get_llm_client
 
         get_llm_client()
-        mock_openai.assert_called_once_with(api_key="sk-test", base_url="http://proxy:4000/v1")
+        mock_openai.assert_called_once_with(api_key="sk-test", base_url="http://proxy:4000/v1", timeout=30)
 
     @patch("src.llm.synthesize.openai.OpenAI")
     @patch("src.llm.synthesize.os.getenv", return_value=None)
@@ -180,7 +180,7 @@ class TestGetAsyncLlmClient:
         from src.llm.synthesize import get_async_llm_client
 
         client = get_async_llm_client()
-        mock_async.assert_called_once_with(api_key="sk-async")
+        mock_async.assert_called_once_with(api_key="sk-async", timeout=30)
         assert client is mock_async.return_value
 
     @patch("src.llm.synthesize.openai.AsyncOpenAI")

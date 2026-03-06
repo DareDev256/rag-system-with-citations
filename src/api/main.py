@@ -1,5 +1,10 @@
 from contextlib import asynccontextmanager
 
+import logging
+import os
+import re
+import time
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -7,9 +12,6 @@ from starlette.responses import Response
 from src.api.schemas import QueryRequest, QueryResponse, Citation
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer_async, classify_query_async
-import logging
-import os
-import time
 
 # Logs
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +28,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.3.6",
+    version="1.3.7",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -49,7 +51,18 @@ _DEFAULT_CSP = (
 )
 
 # HSTS max-age in seconds (default 2 years), override via HSTS_MAX_AGE env var
-_HSTS_MAX_AGE = int(os.getenv("HSTS_MAX_AGE", "63072000"))
+def _parse_hsts_max_age() -> int:
+    raw = os.getenv("HSTS_MAX_AGE", "63072000")
+    try:
+        val = int(raw)
+        if val < 0:
+            raise ValueError
+        return val
+    except (ValueError, TypeError):
+        logger.warning("Invalid HSTS_MAX_AGE '%s', using default 63072000", raw)
+        return 63072000
+
+_HSTS_MAX_AGE = _parse_hsts_max_age()
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -94,7 +107,8 @@ async def query_endpoint(request: QueryRequest):
 
     # 1. Classify (async - non-blocking)
     category = await classify_query_async(original_query)
-    safe_query = original_query.replace("\n", " ").replace("\r", " ")[:200]
+    # Strip all C0 control chars (U+0000–U+001F) to prevent log injection
+    safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
     logger.info("Query: %s | Category: %s", safe_query, category)
 
     # 2. Rewrite if ambiguous (placeholder for future enhancement)

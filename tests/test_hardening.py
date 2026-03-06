@@ -261,3 +261,152 @@ class TestClientKwargs:
             kwargs = _client_kwargs()
             # Empty string is falsy, should not be included
             assert "base_url" not in kwargs
+
+
+# ── LLM Timeout Configuration ───────────────────────────────────
+
+
+class TestLLMTimeout:
+    """Verify OpenAI clients are created with timeout to prevent resource exhaustion."""
+
+    def test_default_timeout_value(self):
+        from src.llm.synthesize import _LLM_TIMEOUT
+        assert _LLM_TIMEOUT == 30
+
+    def test_client_created_with_timeout(self):
+        """get_llm_client passes timeout kwarg to OpenAI constructor."""
+        import src.llm.synthesize as synth
+        synth._llm_client = None  # force re-creation
+        with patch("src.llm.synthesize.openai.OpenAI") as mock_cls:
+            mock_cls.return_value = "fake-client"
+            with patch("src.llm.synthesize._client_kwargs", return_value={"api_key": "k"}):
+                synth.get_llm_client()
+            mock_cls.assert_called_once_with(api_key="k", timeout=30)
+        synth._llm_client = None
+
+    def test_async_client_created_with_timeout(self):
+        """get_async_llm_client passes timeout kwarg to AsyncOpenAI constructor."""
+        import src.llm.synthesize as synth
+        synth._async_llm_client = None
+        with patch("src.llm.synthesize.openai.AsyncOpenAI") as mock_cls:
+            mock_cls.return_value = "fake-async"
+            with patch("src.llm.synthesize._client_kwargs", return_value={"api_key": "k"}):
+                synth.get_async_llm_client()
+            mock_cls.assert_called_once_with(api_key="k", timeout=30)
+        synth._async_llm_client = None
+
+
+# ── Error Message Sanitization ───────────────────────────────────
+
+
+class TestErrorSanitization:
+    """Error handlers must not leak internal details (API keys, paths, etc)."""
+
+    def test_classify_error_logs_type_not_message(self):
+        """classify_query logs exception type name, not the full message."""
+        import src.llm.synthesize as synth
+        synth._llm_client = None
+        mock_client = patch("src.llm.synthesize.get_llm_client").start()
+        mock_client.return_value.chat.completions.create.side_effect = (
+            RuntimeError("Connection to sk-secret-key-here failed")
+        )
+        with patch("src.llm.synthesize.logger") as mock_logger:
+            result = synth.classify_query("test")
+            assert result == "exploratory"
+            log_msg = mock_logger.error.call_args[0][1]
+            assert log_msg == "RuntimeError"
+            assert "sk-secret" not in str(mock_logger.error.call_args)
+        patch.stopall()
+
+    def test_synthesize_error_returns_safe_message(self):
+        """synthesize_answer returns generic error, not exception details."""
+        import src.llm.synthesize as synth
+        synth._llm_client = None
+        mock_client = patch("src.llm.synthesize.get_llm_client").start()
+        mock_client.return_value.chat.completions.create.side_effect = (
+            ConnectionError("upstream at internal-proxy.corp:4000 refused")
+        )
+        result = synth.synthesize_answer("q", [{"doc_id": "d", "snippet": "s"}])
+        assert result["answer"] == "Error generating answer."
+        assert "internal-proxy" not in result["answer"]
+        patch.stopall()
+
+
+# ── Log Injection Control Chars ──────────────────────────────────
+
+
+class TestLogInjectionControlChars:
+    """Query logging must strip all control characters, not just \\n and \\r."""
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_null_bytes_stripped_from_log(self, mock_c, mock_s, mock_p, client):
+        mock_c.return_value = "factual"
+        mock_s.return_value = {"answer": "a", "citations_used": [], "confidence": 0.5}
+        with patch("src.api.main.logger") as mock_log:
+            client.post("/query", json={"query": "hello\x00world\x08test"})
+            logged = mock_log.info.call_args[0][1]
+            assert "\x00" not in logged
+            assert "\x08" not in logged
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_tab_and_escape_stripped(self, mock_c, mock_s, mock_p, client):
+        mock_c.return_value = "factual"
+        mock_s.return_value = {"answer": "a", "citations_used": [], "confidence": 0.5}
+        with patch("src.api.main.logger") as mock_log:
+            client.post("/query", json={"query": "tab\there\x1bescape"})
+            logged = mock_log.info.call_args[0][1]
+            assert "\t" not in logged
+            assert "\x1b" not in logged
+
+
+# ── HSTS_MAX_AGE Validation ──────────────────────────────────────
+
+
+class TestHSTSMaxAgeValidation:
+    """_parse_hsts_max_age must handle invalid env var values gracefully."""
+
+    def test_valid_value(self):
+        from src.api.main import _parse_hsts_max_age
+        with patch("src.api.main.os.getenv", return_value="3600"):
+            assert _parse_hsts_max_age() == 3600
+
+    def test_non_numeric_falls_back(self):
+        from src.api.main import _parse_hsts_max_age
+        with patch("src.api.main.os.getenv", return_value="not_a_number"):
+            assert _parse_hsts_max_age() == 63072000
+
+    def test_negative_falls_back(self):
+        from src.api.main import _parse_hsts_max_age
+        with patch("src.api.main.os.getenv", return_value="-1"):
+            assert _parse_hsts_max_age() == 63072000
+
+
+# ── Path Traversal Guard (load_documents) ────────────────────────
+
+
+class TestPathTraversalGuard:
+    """load_documents must reject symlinks that escape the corpus directory."""
+
+    def test_symlink_outside_corpus_skipped(self, tmp_path):
+        """A symlink pointing outside corpus_dir should be rejected."""
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        secret = outside / "leaked.txt"
+        secret.write_text("secret data")
+
+        corpus = tmp_path / "corpus"
+        corpus.mkdir()
+        (corpus / "legit.txt").write_text("Safe content.")
+        link = corpus / "evil.txt"
+        link.symlink_to(secret)
+
+        docs = load_documents(str(corpus))
+        sources = [d["source"] for d in docs]
+        assert "legit.txt" in sources
+        # Symlink target is outside corpus — should be skipped
+        assert "leaked.txt" not in sources
+        assert "evil.txt" not in sources

@@ -1,3 +1,4 @@
+import logging
 import os
 import re
 import openai
@@ -5,10 +6,15 @@ from typing import List, Dict, Any, Set
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
 from src.utils.timing import measure_latency
 
+logger = logging.getLogger("rag_api")
+
 # Configuration from environment
 DEFAULT_MODEL = "gpt-4o-mini"
 CLASSIFICATION_MODEL = os.getenv("CLASSIFICATION_MODEL", "gpt-4o-mini")
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_MODEL", DEFAULT_MODEL)
+
+# Request timeout in seconds — prevents resource exhaustion from hung upstreams
+_LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
 
 # Cached clients (sync and async)
 _llm_client = None
@@ -38,14 +44,14 @@ def _client_kwargs() -> dict:
 def get_llm_client():
     global _llm_client
     if _llm_client is None:
-        _llm_client = openai.OpenAI(**_client_kwargs())
+        _llm_client = openai.OpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
     return _llm_client
 
 
 def get_async_llm_client():
     global _async_llm_client
     if _async_llm_client is None:
-        _async_llm_client = openai.AsyncOpenAI(**_client_kwargs())
+        _async_llm_client = openai.AsyncOpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
     return _async_llm_client
 
 
@@ -123,7 +129,7 @@ def classify_query(query: str) -> str:
             return "exploratory"
         return category
     except Exception as e:
-        print(f"Classification error: {e}")
+        logger.error("Classification failed: %s", type(e).__name__)
         return "exploratory"
 
 
@@ -170,7 +176,7 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
             "confidence": confidence
         }
     except Exception as e:
-        print(f"Synthesis error: {e}")
+        logger.error("Synthesis failed: %s", type(e).__name__)
         return {
             "answer": "Error generating answer.",
             "citations_used": [],
@@ -198,7 +204,7 @@ async def classify_query_async(query: str) -> str:
             return "exploratory"
         return category
     except Exception as e:
-        print(f"Classification error: {e}")
+        logger.error("Async classification failed: %s", type(e).__name__)
         return "exploratory"
 
 
@@ -244,7 +250,7 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
             "confidence": confidence
         }
     except Exception as e:
-        print(f"Synthesis error: {e}")
+        logger.error("Async synthesis failed: %s", type(e).__name__)
         return {
             "answer": "Error generating answer.",
             "citations_used": [],

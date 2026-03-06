@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.7] - 2026-03-05
+
+### Security
+- **LLM request timeout** — OpenAI clients now enforce a 30s timeout (configurable via `LLM_TIMEOUT` env var) to prevent resource exhaustion from hung upstream connections (CWE-400)
+- **Error message sanitization** — exception handlers log only `type(e).__name__` instead of full error messages, preventing API key and internal path leakage in logs
+- **Full control character stripping** — query logging now strips all C0 control chars (`U+0000`–`U+001F`, `U+007F`) via regex, not just `\n`/`\r`, closing CRLF injection gaps (null bytes, tabs, escape sequences)
+- **HSTS_MAX_AGE validation** — `_parse_hsts_max_age()` now gracefully handles non-numeric and negative values instead of crashing on `int()` conversion
+- **Path traversal guard** — `load_documents()` resolves symlinks via `os.path.realpath()` and rejects files whose canonical path escapes the corpus directory
+
+### Added
+- 11 new hardening tests: LLM timeout (3), error sanitization (2), control char stripping (2), HSTS validation (3), path traversal (1) — 230 total
+
 ## [1.3.6] - 2026-03-05
 
 ### Security

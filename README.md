@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-219 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
+230 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -153,7 +153,7 @@ pytest tests/ -v
 |-------|-------|----------|
 | `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
 | `test_edge_cases.py` | 44 | Unicode, missing keys, boundary values, exception propagation, type coercion, hallucination rate |
-| `test_hardening.py` | 29 | Security headers (CSP directives, HSTS, cache-control, DNS prefetch), prompt injection resistance, file I/O error resilience, `_client_kwargs` config |
+| `test_hardening.py` | 40 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard |
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
@@ -177,6 +177,7 @@ Set via environment variables or `.env`:
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers model for embeddings |
 | `CSP_POLICY` | (strict default) | Override Content-Security-Policy header |
 | `HSTS_MAX_AGE` | `63072000` | HSTS max-age in seconds (default 2 years) |
+| `LLM_TIMEOUT` | `30` | Request timeout in seconds for OpenAI API calls |
 
 ### Using Alternative LLM Providers
 
