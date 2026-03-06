@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1] - 2026-03-06
+
+### Fixed
+- **`search.py` TOCTOU race** — replaced `os.path.exists()` + `os.makedirs()` with atomic `os.makedirs(exist_ok=True)`, matching the fix already applied to `ingest.py` in v1.3.2
+- **`search.py` singleton poisoning** — if `load_index()` raises (corrupted index, permission denied), `_vector_store` is no longer left in a broken state; subsequent retries re-attempt initialization (mirrors `embed.py` fix from v1.3.3)
+- **`prompt.py` double-replacement injection** — `format_rag_prompt` now uses split-and-join instead of chained `.replace()` so documents containing the literal text `{query}` are no longer silently expanded into the user's actual query, preventing context corruption
+
+### Added
+- 4 new tests: singleton poisoning (2), double-replacement context corruption (2) — 234 total
+
 ## [1.4.0] - 2026-03-06
 
 ### Changed

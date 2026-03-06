@@ -11,20 +11,21 @@ _embedder = None
 def get_search_engine():
     global _vector_store, _embedder
     if _vector_store is None:
-        # Default paths
+        # Default paths — exist_ok avoids TOCTOU race between exists() and makedirs()
         base_path = "data_store"
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-            
+        os.makedirs(base_path, exist_ok=True)
+
         index_path = os.path.join(base_path, "faiss.index")
         meta_path = os.path.join(base_path, "meta.json")
-        
-        _vector_store = VectorStore(index_path=index_path, metadata_path=meta_path)
-        _vector_store.load_index()
-        
+
+        store = VectorStore(index_path=index_path, metadata_path=meta_path)
+        store.load_index()
+        # Only assign singleton AFTER successful load — prevents poisoning on failure
+        _vector_store = store
+
     if _embedder is None:
         _embedder = get_embedder()
-        
+
     return _vector_store, _embedder
 
 def perform_search(query: str, k: int = 3):

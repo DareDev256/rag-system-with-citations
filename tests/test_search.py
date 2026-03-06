@@ -143,13 +143,45 @@ class TestGetSearchEngine:
     @patch("src.retrieval.search.get_embedder")
     @patch("src.retrieval.search.VectorStore")
     @patch("src.retrieval.search.os.makedirs")
-    @patch("src.retrieval.search.os.path.exists", return_value=False)
-    def test_creates_data_dir_if_missing(self, mock_exists, mock_makedirs, mock_vs_cls, mock_get_emb):
+    def test_creates_data_dir_with_exist_ok(self, mock_makedirs, mock_vs_cls, mock_get_emb):
         mock_vs_cls.return_value = MagicMock()
         mock_get_emb.return_value = MagicMock()
 
         get_search_engine()
-        mock_makedirs.assert_called_once_with("data_store")
+        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
+
+    @patch("src.retrieval.search.get_embedder")
+    @patch("src.retrieval.search.VectorStore")
+    @patch("src.retrieval.search.os.makedirs")
+    def test_load_index_failure_does_not_poison_singleton(self, mock_makedirs, mock_vs_cls, mock_get_emb):
+        """If load_index() raises, _vector_store must stay None for retry."""
+        mock_store = MagicMock()
+        mock_store.load_index.side_effect = OSError("corrupted index")
+        mock_vs_cls.return_value = mock_store
+        mock_get_emb.return_value = MagicMock()
+
+        with pytest.raises(OSError, match="corrupted index"):
+            get_search_engine()
+        assert search_mod._vector_store is None
+
+    @patch("src.retrieval.search.get_embedder")
+    @patch("src.retrieval.search.VectorStore")
+    @patch("src.retrieval.search.os.makedirs")
+    def test_retry_after_load_failure_succeeds(self, mock_makedirs, mock_vs_cls, mock_get_emb):
+        """After a failed load_index, a second call should re-attempt."""
+        bad_store = MagicMock()
+        bad_store.load_index.side_effect = RuntimeError("transient")
+        good_store = MagicMock()
+        mock_vs_cls.side_effect = [bad_store, good_store]
+        mock_get_emb.return_value = MagicMock()
+
+        with pytest.raises(RuntimeError):
+            get_search_engine()
+        assert search_mod._vector_store is None
+
+        store, _ = get_search_engine()
+        assert store is good_store
+        good_store.load_index.assert_called_once()
 
     @patch("src.retrieval.search.get_embedder")
     @patch("src.retrieval.search.VectorStore")

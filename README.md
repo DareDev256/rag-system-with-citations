@@ -143,7 +143,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-230 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
+234 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -153,12 +153,12 @@ pytest tests/ -v
 |-------|-------|----------|
 | `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
 | `test_edge_cases.py` | 44 | Unicode, missing keys, boundary values, exception propagation, type coercion, hallucination rate |
-| `test_hardening.py` | 40 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard |
+| `test_hardening.py` | 42 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard |
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
 | `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
-| `test_search.py` | 17 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
+| `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
 | `test_integration_gaps.py` | 14 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 

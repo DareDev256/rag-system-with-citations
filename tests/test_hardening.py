@@ -172,6 +172,26 @@ class TestPromptInjection:
         result = format_rag_prompt("ctx", "%(query)s and %(context_str)s")
         assert "%(query)s" in result
 
+    def test_context_containing_query_placeholder_not_expanded(self):
+        """If a document contains literal '{query}', it must NOT be replaced
+        with the user's actual query — that would corrupt context data."""
+        result = format_rag_prompt(
+            "Tutorial: use {query} as a variable name",
+            "how do I format strings?"
+        )
+        # The {query} inside the context must survive as-is
+        assert "{query}" in result
+        # The user's actual query appears once in the User Question slot
+        assert "User Question: how do I format strings?" in result
+
+    def test_mutual_cross_replacement_safety(self):
+        """Neither context nor query should be able to inject into the other's slot."""
+        result = format_rag_prompt("{query}", "{context_str}")
+        # Context slot contains literal {query}
+        assert "Context:\n{query}" in result
+        # Query slot contains literal {context_str}
+        assert "User Question: {context_str}" in result
+
 
 # ── File I/O Error Resilience (load_documents) ──────────────────
 

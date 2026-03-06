@@ -29,8 +29,14 @@ CLASSIFICATION_PROMPT_TEMPLATE = _CLASSIFICATION_PROMPT_TEMPLATE
 
 
 def format_rag_prompt(context_str: str, query: str) -> str:
-    """Build RAG prompt safely — user query cannot trigger format expansion."""
-    return _RAG_PROMPT_TEMPLATE.replace("{context_str}", context_str).replace("{query}", query)
+    """Build RAG prompt safely — user query cannot trigger format expansion.
+
+    Uses split-and-join to avoid double-replacement: if context_str contains
+    the literal text '{query}', a naive chained .replace() would silently
+    expand it into the user's actual query, corrupting the context.
+    """
+    parts = _RAG_PROMPT_TEMPLATE.split("{context_str}", 1)
+    return parts[0] + context_str + parts[1].replace("{query}", query)
 
 
 def format_classification_prompt(query: str) -> str:
