@@ -564,3 +564,104 @@ class TestLLMTimeoutParsing:
         from src.llm.synthesize import _parse_llm_timeout
         with patch("src.llm.synthesize.os.getenv", return_value="-5"):
             assert _parse_llm_timeout() == 30
+
+
+# ── Rate Limiter Memory Exhaustion (CWE-400) ─────────────────────
+
+
+class TestRateLimiterMemory:
+    """_rate_store must not grow unboundedly from IP rotation attacks."""
+
+    def test_evict_stale_ips_removes_empty_entries(self):
+        """IPs with no recent requests should be evicted."""
+        from src.api.main import _evict_stale_ips, _rate_store
+        _rate_store.clear()
+        now = 1000.0
+        _rate_store["stale-ip"] = [now - 120]  # expired (>60s ago)
+        _rate_store["active-ip"] = [now - 10]   # still within window
+        _rate_store["empty-ip"] = []             # empty list, should be evicted
+        _evict_stale_ips(now)
+        assert "stale-ip" not in _rate_store
+        assert "empty-ip" not in _rate_store
+        assert "active-ip" in _rate_store
+        _rate_store.clear()
+
+    def test_max_tracked_ips_triggers_eviction(self):
+        """When IP count exceeds _MAX_TRACKED_IPS, stale entries are purged."""
+        from src.api.main import _check_rate_limit, _rate_store, _MAX_TRACKED_IPS
+        import time as t
+        _rate_store.clear()
+        now = t.monotonic()
+        # Fill with stale IPs (timestamps expired)
+        for i in range(_MAX_TRACKED_IPS + 1):
+            _rate_store[f"ip-{i}"] = [now - 120]
+        # Next check should trigger eviction
+        _check_rate_limit("trigger-ip")
+        assert len(_rate_store) < _MAX_TRACKED_IPS
+        _rate_store.clear()
+
+
+# ── Global Exception Handler (CWE-209) ───────────────────────────
+
+
+class TestGlobalExceptionHandler:
+    """Unhandled exceptions must not leak internal details to clients."""
+
+    @patch("src.api.main.perform_search", side_effect=RuntimeError("secret internal path /opt/data"))
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
+    def test_500_hides_internal_details(self, mock_c, mock_p, client):
+        """Stack traces and internal paths must not appear in 500 responses."""
+        resp = client.post("/query", json={"query": "crash me"})
+        assert resp.status_code == 500
+        body = resp.json()
+        assert body["detail"] == "Internal server error."
+        assert "/opt/data" not in str(body)
+        assert "RuntimeError" not in str(body)
+
+    @patch("src.api.main.perform_search", side_effect=ValueError("bad value"))
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
+    def test_500_includes_request_id(self, mock_c, mock_p, client):
+        """500 responses must include a request_id for incident correlation."""
+        resp = client.post("/query", json={"query": "crash"})
+        assert resp.status_code == 500
+        assert "request_id" in resp.json()
+        assert len(resp.json()["request_id"]) > 0
+
+    @patch("src.api.main.perform_search", side_effect=Exception("boom"))
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
+    def test_500_has_security_headers(self, mock_c, mock_p, client):
+        """Security headers must still appear on 500 responses."""
+        resp = client.post("/query", json={"query": "test"})
+        assert resp.status_code == 500
+        assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+
+
+# ── Request ID Middleware ─────────────────────────────────────────
+
+
+class TestRequestID:
+    """Every response must include X-Request-ID for security traceability."""
+
+    def test_health_returns_request_id(self, client):
+        """Even simple endpoints get a request ID."""
+        resp = client.get("/health")
+        assert "X-Request-ID" in resp.headers
+        assert len(resp.headers["X-Request-ID"]) == 32  # uuid4 hex
+
+    def test_client_provided_id_echoed(self, client):
+        """Valid client-provided X-Request-ID should be preserved."""
+        resp = client.get("/health", headers={"X-Request-ID": "client-trace-abc123"})
+        assert resp.headers["X-Request-ID"] == "client-trace-abc123"
+
+    def test_oversized_id_rejected(self, client):
+        """Client IDs longer than 64 chars are replaced with a server-generated one."""
+        long_id = "x" * 100
+        resp = client.get("/health", headers={"X-Request-ID": long_id})
+        assert resp.headers["X-Request-ID"] != long_id
+        assert len(resp.headers["X-Request-ID"]) == 32
+
+    def test_control_chars_in_id_rejected(self, client):
+        """Client IDs with control characters are replaced to prevent log injection."""
+        resp = client.get("/health", headers={"X-Request-ID": "bad\x00id\x1b"})
+        assert "\x00" not in resp.headers["X-Request-ID"]
+        assert len(resp.headers["X-Request-ID"]) == 32

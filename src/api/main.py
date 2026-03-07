@@ -5,9 +5,11 @@ import logging
 import os
 import re
 import time
+import uuid
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 from src.api.schemas import QueryRequest, QueryResponse, Citation, Diagnostics
@@ -23,6 +25,7 @@ logger = logging.getLogger("rag_api")
 # Each /query call costs real money (OpenAI API). Without rate limiting,
 # any client can drain the budget or DoS the service. CWE-770.
 _RATE_LIMIT = int(os.getenv("RATE_LIMIT_RPM", "30"))  # requests per minute
+_MAX_TRACKED_IPS = 10_000  # cap to prevent memory exhaustion from IP rotation attacks
 _rate_store: dict = defaultdict(list)  # IP -> list of timestamps
 
 
@@ -35,7 +38,20 @@ def _check_rate_limit(client_ip: str) -> bool:
     if len(_rate_store[client_ip]) >= _RATE_LIMIT:
         return False
     _rate_store[client_ip].append(now)
+    # Evict stale IPs to prevent unbounded memory growth (CWE-400).
+    # An attacker rotating through IPs creates keys that linger forever
+    # even after their timestamp lists empty out.
+    if len(_rate_store) > _MAX_TRACKED_IPS:
+        _evict_stale_ips(now)
     return True
+
+
+def _evict_stale_ips(now: float) -> None:
+    """Remove IPs with no recent requests from the rate store."""
+    window = now - 60
+    stale = [ip for ip, ts in _rate_store.items() if not ts or ts[-1] <= window]
+    for ip in stale:
+        del _rate_store[ip]
 
 
 # ─── Output sanitization ─────────────────────────────────────────────
@@ -59,7 +75,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.6.0",
+    version="1.7.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -99,20 +115,60 @@ _HSTS_MAX_AGE = _parse_hsts_max_age()
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response: Response = await call_next(request)
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-DNS-Prefetch-Control"] = "off"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-        response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-        response.headers["Cache-Control"] = "no-store"
-        response.headers["Content-Security-Policy"] = os.getenv("CSP_POLICY", _DEFAULT_CSP)
-        response.headers["Strict-Transport-Security"] = (
-            f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"
-        )
+        _apply_security_headers(response)
         return response
 
 app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ─── Global Exception Handler (CWE-209) ─────────────────────────────
+# FastAPI's default 500 response can leak stack traces, file paths, and
+# internal module names. Catch all unhandled exceptions and return a
+# generic error with a request ID for traceability.
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    request_id = request.state.request_id if hasattr(request.state, "request_id") else "unknown"
+    logger.error("Unhandled %s [request_id=%s]", type(exc).__name__, request_id)
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error.", "request_id": request_id},
+    )
+    # Exception handler responses bypass BaseHTTPMiddleware, so we must
+    # apply security headers directly here to avoid header gaps on 500s.
+    _apply_security_headers(response)
+    return response
+
+
+def _apply_security_headers(response: Response) -> None:
+    """Apply all security headers — shared by middleware and exception handler."""
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-DNS-Prefetch-Control"] = "off"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Content-Security-Policy"] = os.getenv("CSP_POLICY", _DEFAULT_CSP)
+    response.headers["Strict-Transport-Security"] = (
+        f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"
+    )
+
+
+# ─── Request ID Middleware ───────────────────────────────────────────
+# Assigns a unique ID to every request for security incident correlation.
+# Clients can pass X-Request-ID; if absent, one is generated.
+class RequestIDMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        request_id = request.headers.get("X-Request-ID", "")
+        # Validate client-provided IDs — reject oversized or control-char payloads
+        if not request_id or len(request_id) > 64 or _CONTROL_CHAR_RE.search(request_id):
+            request_id = uuid.uuid4().hex
+        request.state.request_id = request_id
+        response = await call_next(request)
+        response.headers["X-Request-ID"] = request_id
+        return response
+
+app.add_middleware(RequestIDMiddleware)
 
 # CORS — restrict to explicit origins in production
 allowed_origins = os.getenv("CORS_ORIGINS", "").split(",")
@@ -145,7 +201,8 @@ async def query_endpoint(request: QueryRequest, req: Request):
     category = await classify_query_async(original_query)
     # Strip all C0 control chars (U+0000–U+001F) to prevent log injection
     safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
-    logger.info("Query: %s | Category: %s", safe_query, category)
+    request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
+    logger.info("Query: %s | Category: %s | request_id=%s", safe_query, category, request_id)
 
     # 2. Rewrite if ambiguous (placeholder for future enhancement)
     final_query = original_query

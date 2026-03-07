@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-03-06
+
+### Security
+- **Rate limiter memory exhaustion fix (CWE-400)** — `_rate_store` now evicts stale IP entries when tracked count exceeds `_MAX_TRACKED_IPS` (10,000), preventing unbounded memory growth from IP rotation attacks
+- **Global exception handler (CWE-209)** — unhandled exceptions now return a generic `"Internal server error."` with a request ID instead of leaking stack traces, file paths, or module names
+- **Exception responses get security headers** — discovered that FastAPI exception handler responses bypass `BaseHTTPMiddleware`; refactored security headers into shared `_apply_security_headers()` helper called from both middleware and exception handler, closing a header gap on 500 responses
+
+### Added
+- **Request ID middleware** — every response includes `X-Request-ID` for security incident correlation; clients can pass their own (validated: max 64 chars, no control chars) or one is auto-generated via `uuid4`
+- **Request ID in query logs** — `/query` log lines now include `request_id=` for end-to-end traceability
+- `_evict_stale_ips()` — garbage collector for expired rate limiter entries
+- 9 new hardening tests: rate limiter memory (2), global exception handler (3), request ID middleware (4) — 258 total
+
 ## [1.6.0] - 2026-03-06
 
 ### Security
