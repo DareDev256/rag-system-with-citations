@@ -14,7 +14,19 @@ CLASSIFICATION_MODEL = os.getenv("CLASSIFICATION_MODEL", "gpt-4o-mini")
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_MODEL", DEFAULT_MODEL)
 
 # Request timeout in seconds — prevents resource exhaustion from hung upstreams
-_LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "30"))
+def _parse_llm_timeout() -> int:
+    """Safely parse LLM_TIMEOUT — same defensive pattern as HSTS_MAX_AGE."""
+    raw = os.getenv("LLM_TIMEOUT", "30")
+    try:
+        val = int(raw)
+        if val <= 0:
+            raise ValueError
+        return val
+    except (ValueError, TypeError):
+        logger.warning("Invalid LLM_TIMEOUT '%s', using default 30", raw)
+        return 30
+
+_LLM_TIMEOUT = _parse_llm_timeout()
 
 # Cached clients (sync and async)
 _llm_client = None

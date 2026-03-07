@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-03-06
+
+### Security
+- **In-memory rate limiter on `/query`** — sliding-window per-IP rate limiting (default 30 req/min, configurable via `RATE_LIMIT_RPM` env var) prevents budget drain and DoS attacks (CWE-770)
+- **LLM output sanitization** — strips C0 control characters from LLM responses before returning to client, preventing terminal injection and ANSI escape attacks while preserving legitimate whitespace (newlines, tabs)
+- **Reflected query sanitization** — the echoed `query` field in responses is now sanitized, preventing control character injection via reflected input
+- **Safe `LLM_TIMEOUT` parsing** — non-numeric, zero, and negative values now fall back to default 30s instead of crashing (matches `HSTS_MAX_AGE` defensive pattern)
+
+### Added
+- `_check_rate_limit()` — sliding-window rate limiter with automatic expiry
+- `_sanitize_output()` — control character filter for LLM responses
+- `_parse_llm_timeout()` — safe env var parser for timeout configuration
+- 11 new hardening tests: rate limiting (3), output sanitization (4), LLM_TIMEOUT parsing (4) — 249 total
+
 ## [1.5.0] - 2026-03-06
 
 ### Added

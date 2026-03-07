@@ -1,3 +1,4 @@
+from collections import defaultdict
 from contextlib import asynccontextmanager
 
 import logging
@@ -18,6 +19,36 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
 
 
+# ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────
+# Each /query call costs real money (OpenAI API). Without rate limiting,
+# any client can drain the budget or DoS the service. CWE-770.
+_RATE_LIMIT = int(os.getenv("RATE_LIMIT_RPM", "30"))  # requests per minute
+_rate_store: dict = defaultdict(list)  # IP -> list of timestamps
+
+
+def _check_rate_limit(client_ip: str) -> bool:
+    """Return True if request is allowed, False if rate-limited."""
+    now = time.monotonic()
+    window = now - 60  # 1-minute sliding window
+    # Prune expired entries
+    _rate_store[client_ip] = [t for t in _rate_store[client_ip] if t > window]
+    if len(_rate_store[client_ip]) >= _RATE_LIMIT:
+        return False
+    _rate_store[client_ip].append(now)
+    return True
+
+
+# ─── Output sanitization ─────────────────────────────────────────────
+# LLM responses are untrusted — strip control chars before returning to client.
+# Input is already sanitized for logging, but output was trusted blindly.
+_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+
+
+def _sanitize_output(text: str) -> str:
+    """Strip C0 control chars from LLM output (preserves \\n, \\r, \\t)."""
+    return _CONTROL_CHAR_RE.sub('', text)
+
+
 @asynccontextmanager
 async def lifespan(app):
     if not os.getenv("OPENAI_API_KEY"):
@@ -28,7 +59,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.5.0",
+    version="1.6.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -101,7 +132,12 @@ async def health():
 
 
 @app.post("/query", response_model=QueryResponse)
-async def query_endpoint(request: QueryRequest):
+async def query_endpoint(request: QueryRequest, req: Request):
+    # Rate limit — protect OpenAI budget and prevent abuse
+    client_ip = req.client.host if req.client else "unknown"
+    if not _check_rate_limit(client_ip):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
+
     start_total = time.perf_counter()
     original_query = request.query
 
@@ -158,10 +194,14 @@ async def query_endpoint(request: QueryRequest):
             hallucinated_citations=hallucinated,
         )
 
+    # Sanitize outputs — LLM responses and reflected query are untrusted
+    safe_answer = _sanitize_output(synthesis_result["answer"])
+    safe_reflected_query = _sanitize_output(original_query)
+
     return QueryResponse(
-        query=original_query,
+        query=safe_reflected_query,
         category=category,
-        answer=synthesis_result["answer"],
+        answer=safe_answer,
         citations=citations,
         confidence=synthesis_result["confidence"],
         latency_ms=round(latency, 2),

@@ -430,3 +430,137 @@ class TestPathTraversalGuard:
         # Symlink target is outside corpus — should be skipped
         assert "leaked.txt" not in sources
         assert "evil.txt" not in sources
+
+
+# ── Rate Limiting (CWE-770) ──────────────────────────────────────
+
+
+class TestRateLimiting:
+    """In-memory rate limiter protects /query from abuse and budget drain."""
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_requests_within_limit_succeed(self, mock_c, mock_s, mock_p, client):
+        """Requests under the rate limit should succeed normally."""
+        mock_c.return_value = "factual"
+        mock_s.return_value = {"answer": "ok", "citations_used": [], "confidence": 0.5}
+        resp = client.post("/query", json={"query": "test"})
+        assert resp.status_code == 200
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_exceeding_rate_limit_returns_429(self, mock_c, mock_s, mock_p, client):
+        """Exceeding RATE_LIMIT_RPM should return 429 Too Many Requests."""
+        mock_c.return_value = "factual"
+        mock_s.return_value = {"answer": "ok", "citations_used": [], "confidence": 0.5}
+        from src.api.main import _rate_store, _RATE_LIMIT
+        import time as t
+        # Stuff the rate store to simulate exhausted quota
+        _rate_store["testclient"] = [t.monotonic()] * (_RATE_LIMIT + 1)
+        resp = client.post("/query", json={"query": "should fail"})
+        assert resp.status_code == 429
+        assert "Rate limit" in resp.json()["detail"]
+        _rate_store.clear()  # cleanup
+
+    def test_rate_limit_has_security_headers(self, client):
+        """429 responses must still include security headers."""
+        from src.api.main import _rate_store, _RATE_LIMIT
+        import time as t
+        _rate_store["testclient"] = [t.monotonic()] * (_RATE_LIMIT + 1)
+        resp = client.post("/query", json={"query": "blocked"})
+        assert resp.status_code == 429
+        assert resp.headers.get("X-Content-Type-Options") == "nosniff"
+        _rate_store.clear()
+
+
+# ── Output Sanitization (LLM responses) ──────────────────────────
+
+
+class TestOutputSanitization:
+    """LLM output and reflected query must be sanitized before returning to client."""
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_control_chars_stripped_from_answer(self, mock_c, mock_s, mock_p, client):
+        """Control chars in LLM output must not reach the client."""
+        mock_c.return_value = "factual"
+        mock_s.return_value = {
+            "answer": "Hello\x00world\x08hidden\x1b[31mred",
+            "citations_used": [],
+            "confidence": 0.5,
+        }
+        resp = client.post("/query", json={"query": "test"})
+        answer = resp.json()["answer"]
+        assert "\x00" not in answer
+        assert "\x08" not in answer
+        assert "\x1b" not in answer
+        assert "Helloworld" in answer
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_newlines_preserved_in_answer(self, mock_c, mock_s, mock_p, client):
+        """Legitimate whitespace (newlines, tabs) in LLM output should survive."""
+        mock_c.return_value = "factual"
+        mock_s.return_value = {
+            "answer": "Line 1\nLine 2\n\tIndented",
+            "citations_used": [],
+            "confidence": 0.5,
+        }
+        resp = client.post("/query", json={"query": "test"})
+        answer = resp.json()["answer"]
+        assert "\n" in answer
+        assert "\t" in answer
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_reflected_query_sanitized(self, mock_c, mock_s, mock_p, client):
+        """The echoed query in the response must be sanitized too."""
+        mock_c.return_value = "factual"
+        mock_s.return_value = {
+            "answer": "ok",
+            "citations_used": [],
+            "confidence": 0.5,
+        }
+        resp = client.post("/query", json={"query": "test\x00inject\x1b"})
+        echoed = resp.json()["query"]
+        assert "\x00" not in echoed
+        assert "\x1b" not in echoed
+
+    def test_sanitize_output_unit(self):
+        """Direct unit test for _sanitize_output."""
+        from src.api.main import _sanitize_output
+        assert _sanitize_output("clean") == "clean"
+        assert _sanitize_output("a\x00b\x08c\x7fd") == "abcd"
+        assert _sanitize_output("keep\nnewlines\tand\rtabs") == "keep\nnewlines\tand\rtabs"
+
+
+# ── LLM_TIMEOUT Safe Parsing ─────────────────────────────────────
+
+
+class TestLLMTimeoutParsing:
+    """_parse_llm_timeout must handle invalid values like _parse_hsts_max_age."""
+
+    def test_valid_value(self):
+        from src.llm.synthesize import _parse_llm_timeout
+        with patch("src.llm.synthesize.os.getenv", return_value="60"):
+            assert _parse_llm_timeout() == 60
+
+    def test_non_numeric_falls_back(self):
+        from src.llm.synthesize import _parse_llm_timeout
+        with patch("src.llm.synthesize.os.getenv", return_value="abc"):
+            assert _parse_llm_timeout() == 30
+
+    def test_zero_falls_back(self):
+        from src.llm.synthesize import _parse_llm_timeout
+        with patch("src.llm.synthesize.os.getenv", return_value="0"):
+            assert _parse_llm_timeout() == 30
+
+    def test_negative_falls_back(self):
+        from src.llm.synthesize import _parse_llm_timeout
+        with patch("src.llm.synthesize.os.getenv", return_value="-5"):
+            assert _parse_llm_timeout() == 30
