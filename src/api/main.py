@@ -9,9 +9,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from src.api.schemas import QueryRequest, QueryResponse, Citation
+from src.api.schemas import QueryRequest, QueryResponse, Citation, Diagnostics
 from src.retrieval.search import perform_search
-from src.llm.synthesize import synthesize_answer_async, classify_query_async
+from src.llm.synthesize import synthesize_answer_async, classify_query_async, extract_cited_doc_ids
 
 # Logs
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +28,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.4.1",
+    version="1.5.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -118,10 +118,14 @@ async def query_endpoint(request: QueryRequest):
         pass
 
     # 3. Retrieve (sync - FAISS is CPU-bound, fast enough)
+    start_retrieval = time.perf_counter()
     search_results = perform_search(final_query, k=request.k)
+    retrieval_ms = (time.perf_counter() - start_retrieval) * 1000
 
     # 4. Synthesize (async - non-blocking LLM call)
+    start_synthesis = time.perf_counter()
     synthesis_result = await synthesize_answer_async(final_query, search_results)
+    synthesis_ms = (time.perf_counter() - start_synthesis) * 1000
 
     # 5. Format Response
     citations = [
@@ -137,13 +141,31 @@ async def query_endpoint(request: QueryRequest):
     end_total = time.perf_counter()
     latency = (end_total - start_total) * 1000
 
+    # 6. Build diagnostics (opt-in)
+    diagnostics = None
+    if request.include_diagnostics:
+        available_ids = {res["doc_id"] for res in search_results}
+        all_cited = extract_cited_doc_ids(synthesis_result["answer"])
+        hallucinated = sorted(all_cited - available_ids)
+        valid_cited = all_cited & available_ids
+        coverage = len(valid_cited) / len(search_results) if search_results else 0.0
+
+        diagnostics = Diagnostics(
+            retrieval_ms=round(retrieval_ms, 2),
+            synthesis_ms=round(synthesis_ms, 2),
+            documents_searched=len(search_results),
+            citation_coverage=round(coverage, 2),
+            hallucinated_citations=hallucinated,
+        )
+
     return QueryResponse(
         query=original_query,
         category=category,
         answer=synthesis_result["answer"],
         citations=citations,
         confidence=synthesis_result["confidence"],
-        latency_ms=round(latency, 2)
+        latency_ms=round(latency, 2),
+        diagnostics=diagnostics,
     )
 
 if __name__ == "__main__":

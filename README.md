@@ -102,6 +102,14 @@ curl -X POST http://localhost:8000/query \
   -d '{"query": "How does FAISS indexing work?", "k": 3}'
 ```
 
+Enable retrieval diagnostics with `include_diagnostics` for per-stage timing, citation coverage, and hallucination detection:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"query": "What is RAG?", "include_diagnostics": true}'
+```
+
 ### Response Format
 
 ```json
@@ -118,7 +126,14 @@ curl -X POST http://localhost:8000/query \
     }
   ],
   "confidence": 0.85,
-  "latency_ms": 1234.56
+  "latency_ms": 1234.56,
+  "diagnostics": {
+    "retrieval_ms": 12.34,
+    "synthesis_ms": 1220.45,
+    "documents_searched": 5,
+    "citation_coverage": 0.2,
+    "hallucinated_citations": []
+  }
 }
 ```
 
@@ -143,7 +158,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-234 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
+238 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -156,7 +171,7 @@ pytest tests/ -v
 | `test_hardening.py` | 42 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard |
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
-| `test_api.py` | 10 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, latency headers |
+| `test_api.py` | 14 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, diagnostics opt-in, hallucination detection |
 | `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
 | `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
 | `test_integration_gaps.py` | 14 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding |

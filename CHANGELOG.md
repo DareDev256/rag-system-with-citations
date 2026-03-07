@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-03-06
+
+### Added
+- **Retrieval diagnostics** — new opt-in `include_diagnostics` parameter on `/query` returns per-stage latency breakdown (`retrieval_ms`, `synthesis_ms`), `documents_searched` count, `citation_coverage` ratio, and `hallucinated_citations` list for full pipeline observability
+- `Diagnostics` Pydantic model in schemas for structured diagnostics response
+- 4 new API tests: diagnostics omitted by default, diagnostics included when requested, hallucinated citation detection, empty results edge case — 238 total
+
 ## [1.4.1] - 2026-03-06
 
 ### Fixed

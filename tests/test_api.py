@@ -95,3 +95,60 @@ class TestQueryEndpoint:
 
     def test_k_out_of_range_rejected(self, client):
         assert client.post("/query", json={"query": "t", "k": 0}).status_code == 422
+
+
+class TestDiagnostics:
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_diagnostics_omitted_by_default(self, mock_classify, mock_synth, mock_search, client):
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {"answer": "RAG [doc_001].", "citations_used": [MOCK_SEARCH[0]], "confidence": 0.8}
+        data = client.post("/query", json={"query": "test"}).json()
+        assert data["diagnostics"] is None
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_diagnostics_included_when_requested(self, mock_classify, mock_synth, mock_search, client):
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "RAG is great [doc_001].",
+            "citations_used": [MOCK_SEARCH[0]],
+            "confidence": 0.8,
+        }
+        data = client.post("/query", json={"query": "test", "include_diagnostics": True}).json()
+        diag = data["diagnostics"]
+        assert diag is not None
+        assert diag["retrieval_ms"] >= 0
+        assert diag["synthesis_ms"] >= 0
+        assert diag["documents_searched"] == 2
+        assert diag["citation_coverage"] == 0.5  # 1 of 2 docs cited
+        assert diag["hallucinated_citations"] == []
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_diagnostics_detects_hallucinated_citations(self, mock_classify, mock_synth, mock_search, client):
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "Answer [doc_001] and [doc_999].",
+            "citations_used": [MOCK_SEARCH[0]],
+            "confidence": 0.6,
+        }
+        data = client.post("/query", json={"query": "test", "include_diagnostics": True}).json()
+        diag = data["diagnostics"]
+        assert "doc_999" in diag["hallucinated_citations"]
+        assert "doc_001" not in diag["hallucinated_citations"]
+
+    @patch("src.api.main.perform_search", return_value=[])
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_diagnostics_empty_results(self, mock_classify, mock_synth, mock_search, client):
+        mock_classify.return_value = "ambiguous"
+        mock_synth.return_value = {"answer": "No info.", "citations_used": [], "confidence": 0.0}
+        data = client.post("/query", json={"query": "test", "include_diagnostics": True}).json()
+        diag = data["diagnostics"]
+        assert diag["documents_searched"] == 0
+        assert diag["citation_coverage"] == 0.0
+        assert diag["hallucinated_citations"] == []
