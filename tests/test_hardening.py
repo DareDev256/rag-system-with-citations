@@ -388,22 +388,22 @@ class TestLogInjectionControlChars:
 
 
 class TestHSTSMaxAgeValidation:
-    """_parse_hsts_max_age must handle invalid env var values gracefully."""
+    """safe_int_env must handle invalid HSTS_MAX_AGE values gracefully."""
 
     def test_valid_value(self):
-        from src.api.main import _parse_hsts_max_age
-        with patch("src.api.main.os.getenv", return_value="3600"):
-            assert _parse_hsts_max_age() == 3600
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="3600"):
+            assert safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0) == 3600
 
     def test_non_numeric_falls_back(self):
-        from src.api.main import _parse_hsts_max_age
-        with patch("src.api.main.os.getenv", return_value="not_a_number"):
-            assert _parse_hsts_max_age() == 63072000
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="not_a_number"):
+            assert safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0) == 63072000
 
     def test_negative_falls_back(self):
-        from src.api.main import _parse_hsts_max_age
-        with patch("src.api.main.os.getenv", return_value="-1"):
-            assert _parse_hsts_max_age() == 63072000
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="-1"):
+            assert safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0) == 63072000
 
 
 # ── Path Traversal Guard (load_documents) ────────────────────────
@@ -544,27 +544,27 @@ class TestOutputSanitization:
 
 
 class TestLLMTimeoutParsing:
-    """_parse_llm_timeout must handle invalid values like _parse_hsts_max_age."""
+    """safe_int_env must handle invalid LLM_TIMEOUT values."""
 
     def test_valid_value(self):
-        from src.llm.synthesize import _parse_llm_timeout
-        with patch("src.llm.synthesize.os.getenv", return_value="60"):
-            assert _parse_llm_timeout() == 60
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="60"):
+            assert safe_int_env("LLM_TIMEOUT", 30, min_val=1) == 60
 
     def test_non_numeric_falls_back(self):
-        from src.llm.synthesize import _parse_llm_timeout
-        with patch("src.llm.synthesize.os.getenv", return_value="abc"):
-            assert _parse_llm_timeout() == 30
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="abc"):
+            assert safe_int_env("LLM_TIMEOUT", 30, min_val=1) == 30
 
     def test_zero_falls_back(self):
-        from src.llm.synthesize import _parse_llm_timeout
-        with patch("src.llm.synthesize.os.getenv", return_value="0"):
-            assert _parse_llm_timeout() == 30
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="0"):
+            assert safe_int_env("LLM_TIMEOUT", 30, min_val=1) == 30
 
     def test_negative_falls_back(self):
-        from src.llm.synthesize import _parse_llm_timeout
-        with patch("src.llm.synthesize.os.getenv", return_value="-5"):
-            assert _parse_llm_timeout() == 30
+        from src.utils.env import safe_int_env
+        with patch("src.utils.env.os.getenv", return_value="-5"):
+            assert safe_int_env("LLM_TIMEOUT", 30, min_val=1) == 30
 
 
 # ── Rate Limiter Memory Exhaustion (CWE-400) ─────────────────────

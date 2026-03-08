@@ -6,6 +6,7 @@ import threading
 import openai
 from typing import List, Dict, Any, Set
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
+from src.utils.env import safe_int_env
 from src.utils.timing import measure_latency
 
 logger = logging.getLogger("rag_api")
@@ -16,19 +17,7 @@ CLASSIFICATION_MODEL = os.getenv("CLASSIFICATION_MODEL", "gpt-4o-mini")
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_MODEL", DEFAULT_MODEL)
 
 # Request timeout in seconds — prevents resource exhaustion from hung upstreams
-def _parse_llm_timeout() -> int:
-    """Safely parse LLM_TIMEOUT — same defensive pattern as HSTS_MAX_AGE."""
-    raw = os.getenv("LLM_TIMEOUT", "30")
-    try:
-        val = int(raw)
-        if val <= 0:
-            raise ValueError
-        return val
-    except (ValueError, TypeError):
-        logger.warning("Invalid LLM_TIMEOUT '%s', using default 30", raw)
-        return 30
-
-_LLM_TIMEOUT = _parse_llm_timeout()
+_LLM_TIMEOUT = safe_int_env("LLM_TIMEOUT", 30, min_val=1)
 
 # Cached clients (sync and async) — guarded by locks to prevent
 # duplicate initialization under concurrent access (CWE-362).
@@ -181,18 +170,25 @@ def _parse_synthesis(response, search_results: List[Dict]) -> Dict[str, Any]:
 _SYNTHESIS_ERROR = {"answer": "Error generating answer.", "citations_used": [], "confidence": 0.0}
 
 
+# ─── LLM call helpers (sync/async DRY) ───────────────────────────────
+
+def _call_llm(client, model: str, messages: list, **kwargs):
+    """Sync LLM call — single entry point for all blocking OpenAI requests."""
+    return client.chat.completions.create(model=model, messages=messages, **kwargs)
+
+
+async def _call_llm_async(client, model: str, messages: list, **kwargs):
+    """Async LLM call — single entry point for all non-blocking OpenAI requests."""
+    return await client.chat.completions.create(model=model, messages=messages, **kwargs)
+
+
 # ─── Sync API ────────────────────────────────────────────────────────
 
 @measure_latency
 def classify_query(query: str) -> str:
     client = get_llm_client()
     try:
-        response = client.chat.completions.create(
-            model=CLASSIFICATION_MODEL,
-            messages=_CLASSIFICATION_MESSAGES(query),
-            temperature=0,
-            max_tokens=10,
-        )
+        response = _call_llm(client, CLASSIFICATION_MODEL, _CLASSIFICATION_MESSAGES(query), temperature=0, max_tokens=10)
         return _parse_classification(response)
     except Exception as e:
         logger.error("Classification failed: %s", type(e).__name__)
@@ -203,14 +199,8 @@ def classify_query(query: str) -> str:
 def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     client = get_llm_client()
     prompt = format_rag_prompt(build_context_str(search_results), query)
-
     try:
-        response = client.chat.completions.create(
-            model=SYNTHESIS_MODEL,
-            messages=_SYNTHESIS_MESSAGES(prompt),
-            temperature=0.0,
-            max_tokens=500,
-        )
+        response = _call_llm(client, SYNTHESIS_MODEL, _SYNTHESIS_MESSAGES(prompt), temperature=0.0, max_tokens=500)
         return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Synthesis failed: %s", type(e).__name__)
@@ -223,12 +213,7 @@ async def classify_query_async(query: str) -> str:
     """Async version of classify_query for non-blocking API calls."""
     client = await get_async_llm_client()
     try:
-        response = await client.chat.completions.create(
-            model=CLASSIFICATION_MODEL,
-            messages=_CLASSIFICATION_MESSAGES(query),
-            temperature=0,
-            max_tokens=10,
-        )
+        response = await _call_llm_async(client, CLASSIFICATION_MODEL, _CLASSIFICATION_MESSAGES(query), temperature=0, max_tokens=10)
         return _parse_classification(response)
     except Exception as e:
         logger.error("Async classification failed: %s", type(e).__name__)
@@ -239,14 +224,8 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
     """Async version of synthesize_answer for non-blocking API calls."""
     client = await get_async_llm_client()
     prompt = format_rag_prompt(build_context_str(search_results), query)
-
     try:
-        response = await client.chat.completions.create(
-            model=SYNTHESIS_MODEL,
-            messages=_SYNTHESIS_MESSAGES(prompt),
-            temperature=0.0,
-            max_tokens=500,
-        )
+        response = await _call_llm_async(client, SYNTHESIS_MODEL, _SYNTHESIS_MESSAGES(prompt), temperature=0.0, max_tokens=500)
         return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Async synthesis failed: %s", type(e).__name__)

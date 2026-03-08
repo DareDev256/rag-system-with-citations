@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-03-08
+
+### Changed
+- **Extracted `safe_int_env()` helper** (`src/utils/env.py`) — consolidates the defensive env-var parsing pattern duplicated across `_parse_llm_timeout()` (synthesize.py) and `_parse_hsts_max_age()` (main.py) into a single reusable function with bounds checking and graceful fallback; now also used for `RATE_LIMIT_RPM`
+- **Extracted `_SECURITY_HEADERS` dict** (main.py) — 7 static security headers are now a declarative dict instead of scattered assignments, making them easier to audit and extend; dynamic headers (CSP, HSTS) remain explicit
+- **Extracted `_call_llm()` / `_call_llm_async()` wrappers** (synthesize.py) — all OpenAI API calls now route through a single sync/async entry point, further reducing duplication between the sync and async code paths
+- **Deleted `_parse_llm_timeout()`** and **`_parse_hsts_max_age()`** — replaced by `safe_int_env()` calls
+- Updated 7 existing tests to target `safe_int_env` instead of deleted parser functions
+
 ## [1.7.1] - 2026-03-08
 
 ### Fixed

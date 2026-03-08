@@ -15,6 +15,7 @@ from starlette.responses import Response
 from src.api.schemas import QueryRequest, QueryResponse, Citation, Diagnostics
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer_async, classify_query_async, extract_cited_doc_ids
+from src.utils.env import safe_int_env
 
 # Logs
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +25,7 @@ logger = logging.getLogger("rag_api")
 # ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────
 # Each /query call costs real money (OpenAI API). Without rate limiting,
 # any client can drain the budget or DoS the service. CWE-770.
-_RATE_LIMIT = int(os.getenv("RATE_LIMIT_RPM", "30"))  # requests per minute
+_RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1)
 _MAX_TRACKED_IPS = 10_000  # cap to prevent memory exhaustion from IP rotation attacks
 _rate_store: dict = defaultdict(list)  # IP -> list of timestamps
 
@@ -75,7 +76,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.7.1",
+    version="1.8.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -98,18 +99,7 @@ _DEFAULT_CSP = (
 )
 
 # HSTS max-age in seconds (default 2 years), override via HSTS_MAX_AGE env var
-def _parse_hsts_max_age() -> int:
-    raw = os.getenv("HSTS_MAX_AGE", "63072000")
-    try:
-        val = int(raw)
-        if val < 0:
-            raise ValueError
-        return val
-    except (ValueError, TypeError):
-        logger.warning("Invalid HSTS_MAX_AGE '%s', using default 63072000", raw)
-        return 63072000
-
-_HSTS_MAX_AGE = _parse_hsts_max_age()
+_HSTS_MAX_AGE = safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0)
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -139,15 +129,23 @@ async def _global_exception_handler(request: Request, exc: Exception):
     return response
 
 
+# Declarative security headers — add/audit in one place, applied everywhere.
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "X-DNS-Prefetch-Control": "off",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+    "X-Permitted-Cross-Domain-Policies": "none",
+    "Cache-Control": "no-store",
+}
+
+
 def _apply_security_headers(response: Response) -> None:
     """Apply all security headers — shared by middleware and exception handler."""
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-DNS-Prefetch-Control"] = "off"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    response.headers["X-Permitted-Cross-Domain-Policies"] = "none"
-    response.headers["Cache-Control"] = "no-store"
+    for header, value in _SECURITY_HEADERS.items():
+        response.headers[header] = value
+    # Dynamic headers that depend on env config
     response.headers["Content-Security-Policy"] = os.getenv("CSP_POLICY", _DEFAULT_CSP)
     response.headers["Strict-Transport-Security"] = (
         f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"

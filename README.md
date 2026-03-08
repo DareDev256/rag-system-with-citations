@@ -59,6 +59,7 @@ src/
 │   ├── corpus/          # Source documents (.txt)
 │   └── ingest.py        # Document loading + chunking + indexing
 └── utils/
+    ├── env.py           # Safe environment variable parsing (int with bounds)
     └── timing.py        # Latency measurement decorator
 ```
 
