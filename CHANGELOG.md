@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.1] - 2026-03-08
+
+### Security
+- **Citation field sanitization (CWE-116)** — `doc_id`, `snippet`, and `source` fields in `/query` response citations now pass through `_sanitize_output()` to strip C0 control characters; previously only the LLM answer and reflected query were sanitized, leaving corpus-sourced fields as an unsanitized output channel for terminal injection and ANSI escape attacks
+
+### Added
+- 4 new tests: snippet control char stripping, doc_id sanitization, source filename sanitization, None source handling — 265 total
+
 ## [1.8.0] - 2026-03-08
 
 ### Changed

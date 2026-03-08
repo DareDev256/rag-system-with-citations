@@ -76,7 +76,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.8.0",
+    version="1.8.1",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -218,13 +218,15 @@ async def query_endpoint(request: QueryRequest, req: Request):
     synthesis_result = await synthesize_answer_async(final_query, search_results)
     synthesis_ms = (time.perf_counter() - start_synthesis) * 1000
 
-    # 5. Format Response
+    # 5. Format Response — sanitize all corpus-sourced fields (CWE-116)
+    # Snippets and source filenames originate from user-supplied documents
+    # (or meta.json on disk) and are as untrusted as LLM output.
     citations = [
         Citation(
-            doc_id=res["doc_id"],
-            snippet=res["snippet"],
+            doc_id=_sanitize_output(res["doc_id"]),
+            snippet=_sanitize_output(res["snippet"]),
             score=res.get("score"),
-            source=res.get("source")
+            source=_sanitize_output(res["source"]) if res.get("source") else None,
         )
         for res in synthesis_result.get("citations_used", [])
     ]

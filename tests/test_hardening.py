@@ -666,3 +666,82 @@ class TestRequestID:
         resp = client.get("/health", headers={"X-Request-ID": "bad\x00id\x1b"})
         assert "\x00" not in resp.headers["X-Request-ID"]
         assert len(resp.headers["X-Request-ID"]) == 32
+
+
+# ── Citation Snippet Sanitization (CWE-116) ─────────────────────
+
+
+MOCK_SEARCH_DIRTY = [
+    {"doc_id": "doc\x00evil", "snippet": "Clean text \x1b[31mred\x1b[0m hidden.", "score": 0.9, "source": "file\x07bell.txt"},
+    {"doc_id": "doc_002", "snippet": "Normal snippet.", "score": 0.8, "source": "normal.txt"},
+]
+
+
+class TestCitationSnippetSanitization:
+    """Citation fields (doc_id, snippet, source) originate from corpus
+    documents or meta.json — they are untrusted and must be sanitized
+    before inclusion in API responses, just like LLM output."""
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH_DIRTY)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_snippet_control_chars_stripped(self, mock_classify, mock_synth, mock_search, client):
+        """Control characters in citation snippets must be stripped (CWE-116)."""
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "Answer [doc_evil].",
+            "citations_used": [MOCK_SEARCH_DIRTY[0]],
+            "confidence": 0.7,
+        }
+        data = client.post("/query", json={"query": "test"}).json()
+        snippet = data["citations"][0]["snippet"]
+        assert "\x1b" not in snippet
+        assert "\x00" not in snippet
+        assert "Clean text" in snippet
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH_DIRTY)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_doc_id_control_chars_stripped(self, mock_classify, mock_synth, mock_search, client):
+        """Control characters in doc_id must be stripped."""
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "Answer.",
+            "citations_used": [MOCK_SEARCH_DIRTY[0]],
+            "confidence": 0.7,
+        }
+        data = client.post("/query", json={"query": "test"}).json()
+        doc_id = data["citations"][0]["doc_id"]
+        assert "\x00" not in doc_id
+        assert "docevil" == doc_id
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH_DIRTY)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_source_control_chars_stripped(self, mock_classify, mock_synth, mock_search, client):
+        """Control characters in source filename must be stripped."""
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "Answer.",
+            "citations_used": [MOCK_SEARCH_DIRTY[0]],
+            "confidence": 0.7,
+        }
+        data = client.post("/query", json={"query": "test"}).json()
+        source = data["citations"][0]["source"]
+        assert "\x07" not in source
+        assert "filebell.txt" == source
+
+    @patch("src.api.main.perform_search", return_value=MOCK_SEARCH_DIRTY)
+    @patch("src.api.main.synthesize_answer_async", new_callable=AsyncMock)
+    @patch("src.api.main.classify_query_async", new_callable=AsyncMock)
+    def test_none_source_preserved(self, mock_classify, mock_synth, mock_search, client):
+        """Citations with no source field should not crash sanitization."""
+        no_source = {"doc_id": "doc_x", "snippet": "Text.", "score": 0.5}
+        mock_classify.return_value = "factual"
+        mock_synth.return_value = {
+            "answer": "Answer.",
+            "citations_used": [no_source],
+            "confidence": 0.5,
+        }
+        data = client.post("/query", json={"query": "test"}).json()
+        assert data["citations"][0]["source"] is None
