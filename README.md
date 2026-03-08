@@ -158,7 +158,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-258 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
+261 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -174,7 +174,7 @@ pytest tests/ -v
 | `test_api.py` | 14 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, diagnostics opt-in, hallucination detection |
 | `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
 | `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
-| `test_integration_gaps.py` | 14 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding |
+| `test_integration_gaps.py` | 17 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks) |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.

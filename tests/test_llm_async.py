@@ -32,43 +32,43 @@ SEARCH_RESULTS = [
 
 class TestClassifyQueryAsync:
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_returns_factual(self, mock_get):
         mock_get.return_value = _mock_async_client("factual")
         assert await classify_query_async("What is RAG?") == "factual"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_returns_exploratory(self, mock_get):
         mock_get.return_value = _mock_async_client("exploratory")
         assert await classify_query_async("Tell me about AI") == "exploratory"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_returns_ambiguous(self, mock_get):
         mock_get.return_value = _mock_async_client("ambiguous")
         assert await classify_query_async("stuff") == "ambiguous"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_invalid_category_defaults_to_exploratory(self, mock_get):
         mock_get.return_value = _mock_async_client("nonsense_category")
         assert await classify_query_async("something") == "exploratory"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_strips_whitespace(self, mock_get):
         mock_get.return_value = _mock_async_client("  factual  \n")
         assert await classify_query_async("What is X?") == "factual"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_api_error_defaults_to_exploratory(self, mock_get):
         mock_get.return_value = _mock_async_client(side_effect=Exception("API down"))
         assert await classify_query_async("What is X?") == "exploratory"
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_calls_openai_with_correct_params(self, mock_get):
         client = _mock_async_client("factual")
         mock_get.return_value = client
@@ -83,7 +83,7 @@ class TestClassifyQueryAsync:
 
 class TestSynthesizeAnswerAsync:
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_returns_answer_with_citations(self, mock_get):
         mock_get.return_value = _mock_async_client(
             "RAG is great [doc_001] and fast [doc_002]."
@@ -95,7 +95,7 @@ class TestSynthesizeAnswerAsync:
         assert result["confidence"] == 1.0
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_partial_citations(self, mock_get):
         mock_get.return_value = _mock_async_client("Only this source [doc_001].")
         result = await synthesize_answer_async("What is RAG?", SEARCH_RESULTS)
@@ -104,7 +104,7 @@ class TestSynthesizeAnswerAsync:
         assert result["confidence"] == 0.8  # 0.6 + 0.4 * (1/2)
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_no_citations_falls_back_to_top_result(self, mock_get):
         mock_get.return_value = _mock_async_client(
             "RAG is a technique for improving LLM answers."
@@ -115,7 +115,7 @@ class TestSynthesizeAnswerAsync:
         assert result["confidence"] == 0.3
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_api_error_returns_error_dict(self, mock_get):
         mock_get.return_value = _mock_async_client(
             side_effect=Exception("API quota exceeded")
@@ -126,7 +126,7 @@ class TestSynthesizeAnswerAsync:
         assert result["confidence"] == 0.0
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_hallucinated_citation_filtered_out(self, mock_get):
         mock_get.return_value = _mock_async_client("Answer [doc_001] and [doc_999].")
         result = await synthesize_answer_async("question", SEARCH_RESULTS)
@@ -135,7 +135,7 @@ class TestSynthesizeAnswerAsync:
         assert "doc_001" in cited_ids
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_empty_search_results(self, mock_get):
         mock_get.return_value = _mock_async_client(
             "I cannot answer this based on the provided documents."
@@ -144,7 +144,7 @@ class TestSynthesizeAnswerAsync:
         assert result["confidence"] == 0.0
 
     @pytest.mark.asyncio
-    @patch("src.llm.synthesize.get_async_llm_client")
+    @patch("src.llm.synthesize.get_async_llm_client", new_callable=AsyncMock)
     async def test_refusal_gets_low_confidence(self, mock_get):
         mock_get.return_value = _mock_async_client(
             "I cannot answer this question based on the provided context."

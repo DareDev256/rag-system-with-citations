@@ -304,14 +304,15 @@ class TestLLMTimeout:
             mock_cls.assert_called_once_with(api_key="k", timeout=30)
         synth._llm_client = None
 
-    def test_async_client_created_with_timeout(self):
+    @pytest.mark.asyncio
+    async def test_async_client_created_with_timeout(self):
         """get_async_llm_client passes timeout kwarg to AsyncOpenAI constructor."""
         import src.llm.synthesize as synth
         synth._async_llm_client = None
         with patch("src.llm.synthesize.openai.AsyncOpenAI") as mock_cls:
             mock_cls.return_value = "fake-async"
             with patch("src.llm.synthesize._client_kwargs", return_value={"api_key": "k"}):
-                synth.get_async_llm_client()
+                await synth.get_async_llm_client()
             mock_cls.assert_called_once_with(api_key="k", timeout=30)
         synth._async_llm_client = None
 

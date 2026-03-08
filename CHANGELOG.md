@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.1] - 2026-03-08
+
+### Fixed
+- **Race condition in singleton initialization (CWE-362)** — `get_llm_client()`, `get_async_llm_client()`, and `get_search_engine()` used unguarded check-then-act patterns on global singletons; under concurrent access (multiple threads or asyncio tasks), duplicate clients could be created, leaking connections and causing subtle state bugs. Added `threading.Lock` for sync factories and `asyncio.Lock` for the async factory with double-checked locking.
+
+### Changed
+- `get_async_llm_client()` is now `async def` — callers must `await` it, matching the concurrency model it protects
+
+### Added
+- 3 new race condition tests: concurrent thread safety for sync client (1), concurrent asyncio task safety for async client (1), concurrent thread safety for search engine (1) — 261 total
+
 ## [1.7.0] - 2026-03-06
 
 ### Security

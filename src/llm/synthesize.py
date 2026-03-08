@@ -1,6 +1,8 @@
+import asyncio
 import logging
 import os
 import re
+import threading
 import openai
 from typing import List, Dict, Any, Set
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
@@ -28,9 +30,12 @@ def _parse_llm_timeout() -> int:
 
 _LLM_TIMEOUT = _parse_llm_timeout()
 
-# Cached clients (sync and async)
+# Cached clients (sync and async) — guarded by locks to prevent
+# duplicate initialization under concurrent access (CWE-362).
 _llm_client = None
 _async_llm_client = None
+_sync_client_lock = threading.Lock()
+_async_client_lock = asyncio.Lock()
 
 
 def _client_kwargs() -> dict:
@@ -55,15 +60,22 @@ def _client_kwargs() -> dict:
 
 def get_llm_client():
     global _llm_client
-    if _llm_client is None:
-        _llm_client = openai.OpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
+    if _llm_client is not None:
+        return _llm_client
+    with _sync_client_lock:
+        # Double-check after acquiring lock — another thread may have initialized
+        if _llm_client is None:
+            _llm_client = openai.OpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
     return _llm_client
 
 
-def get_async_llm_client():
+async def get_async_llm_client():
     global _async_llm_client
-    if _async_llm_client is None:
-        _async_llm_client = openai.AsyncOpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
+    if _async_llm_client is not None:
+        return _async_llm_client
+    async with _async_client_lock:
+        if _async_llm_client is None:
+            _async_llm_client = openai.AsyncOpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)
     return _async_llm_client
 
 
@@ -209,7 +221,7 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
 
 async def classify_query_async(query: str) -> str:
     """Async version of classify_query for non-blocking API calls."""
-    client = get_async_llm_client()
+    client = await get_async_llm_client()
     try:
         response = await client.chat.completions.create(
             model=CLASSIFICATION_MODEL,
@@ -225,7 +237,7 @@ async def classify_query_async(query: str) -> str:
 
 async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     """Async version of synthesize_answer for non-blocking API calls."""
-    client = get_async_llm_client()
+    client = await get_async_llm_client()
     prompt = format_rag_prompt(build_context_str(search_results), query)
 
     try:
