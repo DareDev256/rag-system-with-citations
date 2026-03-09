@@ -12,9 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
-from src.api.schemas import QueryRequest, QueryResponse, Citation, Diagnostics
+from src.api.schemas import QueryRequest, QueryResponse
+from src.api.response import build_citations, build_diagnostics
 from src.retrieval.search import perform_search
-from src.llm.synthesize import synthesize_answer_async, classify_query_async, extract_cited_doc_ids
+from src.llm.synthesize import classify_query_async, synthesize_answer_async
 from src.utils.env import safe_int_env
 
 # Logs
@@ -76,7 +77,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.8.2",
+    version="1.9.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -219,17 +220,7 @@ async def query_endpoint(request: QueryRequest, req: Request):
     synthesis_ms = (time.perf_counter() - start_synthesis) * 1000
 
     # 5. Format Response — sanitize all corpus-sourced fields (CWE-116)
-    # Snippets and source filenames originate from user-supplied documents
-    # (or meta.json on disk) and are as untrusted as LLM output.
-    citations = [
-        Citation(
-            doc_id=_sanitize_output(res["doc_id"]),
-            snippet=_sanitize_output(res["snippet"]),
-            score=res.get("score"),
-            source=_sanitize_output(res["source"]) if res.get("source") else None,
-        )
-        for res in synthesis_result.get("citations_used", [])
-    ]
+    citations = build_citations(search_results, synthesis_result, _sanitize_output)
 
     end_total = time.perf_counter()
     latency = (end_total - start_total) * 1000
@@ -237,28 +228,14 @@ async def query_endpoint(request: QueryRequest, req: Request):
     # 6. Build diagnostics (opt-in)
     diagnostics = None
     if request.include_diagnostics:
-        available_ids = {res["doc_id"] for res in search_results}
-        all_cited = extract_cited_doc_ids(synthesis_result["answer"])
-        hallucinated = sorted(all_cited - available_ids)
-        valid_cited = all_cited & available_ids
-        coverage = len(valid_cited) / len(search_results) if search_results else 0.0
-
-        diagnostics = Diagnostics(
-            retrieval_ms=round(retrieval_ms, 2),
-            synthesis_ms=round(synthesis_ms, 2),
-            documents_searched=len(search_results),
-            citation_coverage=round(coverage, 2),
-            hallucinated_citations=hallucinated,
+        diagnostics = build_diagnostics(
+            search_results, synthesis_result["answer"], retrieval_ms, synthesis_ms,
         )
 
-    # Sanitize outputs — LLM responses and reflected query are untrusted
-    safe_answer = _sanitize_output(synthesis_result["answer"])
-    safe_reflected_query = _sanitize_output(original_query)
-
     return QueryResponse(
-        query=safe_reflected_query,
+        query=_sanitize_output(original_query),
         category=category,
-        answer=safe_answer,
+        answer=_sanitize_output(synthesis_result["answer"]),
         citations=citations,
         confidence=synthesis_result["confidence"],
         latency_ms=round(latency, 2),

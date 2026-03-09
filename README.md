@@ -44,6 +44,7 @@ Standard LLM APIs hallucinate. This system forces every answer to cite its sourc
 src/
 ├── api/
 │   ├── main.py          # FastAPI app, /query and /health endpoints
+│   ├── response.py      # Citation and diagnostics response builders
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates

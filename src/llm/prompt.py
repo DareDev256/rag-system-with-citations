@@ -23,10 +23,6 @@ Query: {query}
 
 Return only the category name in lowercase."""
 
-# Keep old names for backwards compat (read-only usage in tests)
-RAG_PROMPT_TEMPLATE = _RAG_PROMPT_TEMPLATE
-CLASSIFICATION_PROMPT_TEMPLATE = _CLASSIFICATION_PROMPT_TEMPLATE
-
 
 def format_rag_prompt(context_str: str, query: str) -> str:
     """Build RAG prompt safely — user query cannot trigger format expansion.

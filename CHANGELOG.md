@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.0] - 2026-03-09
+
+### Changed
+- **Extracted `response.py` module** (`src/api/response.py`) — citation assembly and diagnostics computation extracted from the 80-line `query_endpoint` handler into `build_citations()` and `build_diagnostics()` helpers; endpoint now reads as a clean pipeline orchestrator (classify → retrieve → synthesize → format)
+- **Removed dead backwards-compat aliases** from `prompt.py` — `RAG_PROMPT_TEMPLATE` and `CLASSIFICATION_PROMPT_TEMPLATE` module-level aliases were unused by any test or import; deleted to reduce confusion
+
 ## [1.8.2] - 2026-03-08
 
 ### Added
