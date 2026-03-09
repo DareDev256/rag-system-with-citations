@@ -210,6 +210,10 @@ export SYNTHESIS_MODEL=claude-sonnet-4-20250514
 
 See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup guides (LiteLLM, OpenRouter, Ollama, vLLM).
 
+### Security
+
+12-layer defense-in-depth covering rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+
 ## Docker
 
 ```bash

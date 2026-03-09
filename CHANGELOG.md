@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.2] - 2026-03-08
+
+### Added
+- **Security architecture documentation** (`docs/security.md`) — comprehensive threat model mapping 12 defense layers to specific CWEs, with configuration reference, architecture diagram, and known gaps table; consolidates security context previously scattered across changelog entries
+- README security section linking to the new doc
+
 ## [1.8.1] - 2026-03-08
 
 ### Security
