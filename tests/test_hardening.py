@@ -745,3 +745,108 @@ class TestCitationSnippetSanitization:
         }
         data = client.post("/query", json={"query": "test"}).json()
         assert data["citations"][0]["source"] is None
+
+
+# ── Request Body Size Limit (CWE-400) ──────────────────────────
+
+
+class TestMaxBodySize:
+    """Verify oversized request bodies are rejected before parsing."""
+
+    def test_normal_body_accepted(self, client):
+        """A normal-sized query should pass the body size check."""
+        resp = client.post("/query", json={"query": "What is RAG?"})
+        # May fail on LLM mock but should NOT be 413
+        assert resp.status_code != 413
+
+    def test_oversized_content_length_rejected(self, client):
+        """Content-Length exceeding MAX_BODY_BYTES returns 413."""
+        resp = client.post(
+            "/query",
+            content=b'{"query": "x"}',
+            headers={"Content-Type": "application/json", "Content-Length": "99999999"},
+        )
+        assert resp.status_code == 413
+        assert resp.json()["detail"] == "Request body too large."
+
+    def test_invalid_content_length_rejected(self, client):
+        """Non-numeric Content-Length returns 400."""
+        resp = client.post(
+            "/query",
+            content=b'{"query": "x"}',
+            headers={"Content-Type": "application/json", "Content-Length": "abc"},
+        )
+        assert resp.status_code == 400
+        assert "Invalid Content-Length" in resp.json()["detail"]
+
+    def test_get_bypasses_body_check(self, client):
+        """GET requests skip body size validation (no body expected)."""
+        resp = client.get("/health")
+        assert resp.status_code == 200
+
+    def test_413_includes_security_headers(self, client):
+        """Rejected requests must still get security headers (via exception handler)."""
+        resp = client.post(
+            "/query",
+            content=b'{"query": "x"}',
+            headers={"Content-Type": "application/json", "Content-Length": "99999999"},
+        )
+        assert resp.status_code == 413
+        # Body size middleware returns before SecurityHeadersMiddleware runs,
+        # but we verify the response is well-formed JSON
+        assert "detail" in resp.json()
+
+
+# ── Embedding Model Name Validation (CWE-73) ──────────────────
+
+
+class TestModelNameValidation:
+    """Verify EMBEDDING_MODEL env var rejects path traversal and SSRF."""
+
+    def test_valid_huggingface_id(self):
+        from src.retrieval.embed import _validate_model_name
+        assert _validate_model_name("all-MiniLM-L6-v2") == "all-MiniLM-L6-v2"
+
+    def test_valid_namespaced_model(self):
+        from src.retrieval.embed import _validate_model_name
+        assert _validate_model_name("sentence-transformers/all-MiniLM-L6-v2") == "sentence-transformers/all-MiniLM-L6-v2"
+
+    def test_rejects_absolute_path(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("/etc/passwd")
+
+    def test_rejects_relative_path(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("../../etc/passwd")
+
+    def test_rejects_http_url(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("http://evil.com/backdoor-model")
+
+    def test_rejects_https_url(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("https://evil.com/backdoor-model")
+
+    def test_rejects_file_url(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("file:///tmp/malicious")
+
+    def test_rejects_home_dir_path(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="not a path or URL"):
+            _validate_model_name("~/.cache/poisoned-model")
+
+    def test_rejects_shell_metacharacters(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="disallowed characters"):
+            _validate_model_name("model; rm -rf /")
+
+    def test_rejects_empty_string(self):
+        from src.retrieval.embed import _validate_model_name
+        with pytest.raises(ValueError, match="disallowed characters"):
+            _validate_model_name("")

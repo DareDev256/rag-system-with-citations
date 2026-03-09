@@ -18,6 +18,33 @@ from src.retrieval.search import perform_search
 from src.llm.synthesize import classify_query_async, synthesize_answer_async
 from src.utils.env import safe_int_env
 
+# ─── Request Body Size Limit (CWE-400) ───────────────────────────
+# Pydantic validates field lengths AFTER the full body is buffered into memory.
+# Without an early size check, an attacker can POST multi-MB payloads that
+# exhaust memory before validation ever fires — bypassing rate limiting too.
+_MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024)
+
+
+class MaxBodySizeMiddleware(BaseHTTPMiddleware):
+    """Reject requests with bodies exceeding _MAX_BODY_BYTES before parsing."""
+
+    async def dispatch(self, request: Request, call_next):
+        if request.method in ("POST", "PUT", "PATCH"):
+            content_length = request.headers.get("content-length")
+            if content_length:
+                try:
+                    if int(content_length) > _MAX_BODY_BYTES:
+                        return JSONResponse(
+                            status_code=413,
+                            content={"detail": "Request body too large."},
+                        )
+                except ValueError:
+                    return JSONResponse(
+                        status_code=400,
+                        content={"detail": "Invalid Content-Length header."},
+                    )
+        return await call_next(request)
+
 # Logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
@@ -77,7 +104,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.9.0",
+    version="1.10.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -168,6 +195,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
         return response
 
 app.add_middleware(RequestIDMiddleware)
+app.add_middleware(MaxBodySizeMiddleware)
 
 # CORS — restrict to explicit origins in production
 allowed_origins = os.getenv("CORS_ORIGINS", "").split(",")

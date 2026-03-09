@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.0] - 2026-03-09
+
+### Security
+- **Request body size limit (CWE-400)** — new `MaxBodySizeMiddleware` rejects POST/PUT/PATCH requests exceeding `MAX_BODY_BYTES` (default 64 KB) before the body is parsed, preventing memory exhaustion attacks that bypass Pydantic validation and rate limiting
+- **Embedding model name validation (CWE-73)** — `EMBEDDING_MODEL` env var is now validated against an allowlist regex at startup; rejects filesystem paths (`../../etc/passwd`), URLs (`http://evil.com/backdoor`), `file://` URIs, home directory references (`~/`), and shell metacharacters to prevent path traversal and SSRF at model load time
+
+### Added
+- `MaxBodySizeMiddleware` in `main.py` — early Content-Length check with 413 response
+- `_validate_model_name()` in `embed.py` — startup-time model name sanitization
+- `MAX_BODY_BYTES` env var (default 65536, min 1024) for configurable body size limit
+- 15 new tests: body size enforcement (5), model name validation (10) — 280 total
+
 ## [1.9.0] - 2026-03-09
 
 ### Changed

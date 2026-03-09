@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-265 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
+280 tests across 10 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -170,7 +170,7 @@ pytest tests/ -v
 |-------|-------|----------|
 | `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
 | `test_edge_cases.py` | 44 | Unicode, missing keys, boundary values, exception propagation, type coercion, hallucination rate |
-| `test_hardening.py` | 66 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard, rate limiting, output sanitization, LLM_TIMEOUT parsing, rate limiter memory exhaustion, global exception handler, request ID middleware, citation snippet sanitization |
+| `test_hardening.py` | 81 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard, rate limiting, output sanitization, LLM_TIMEOUT parsing, rate limiter memory exhaustion, global exception handler, request ID middleware, citation snippet sanitization, request body size limit, embedding model name validation |
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 14 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, diagnostics opt-in, hallucination detection |
@@ -196,6 +196,7 @@ Set via environment variables or `.env`:
 | `HSTS_MAX_AGE` | `63072000` | HSTS max-age in seconds (default 2 years) |
 | `LLM_TIMEOUT` | `30` | Request timeout in seconds for OpenAI API calls |
 | `RATE_LIMIT_RPM` | `30` | Max requests per minute per IP on `/query` |
+| `MAX_BODY_BYTES` | `65536` | Maximum request body size in bytes (rejects with 413) |
 
 All responses include `X-Request-ID` for security incident traceability. Pass your own via request header (max 64 chars) or one is auto-generated.
 
