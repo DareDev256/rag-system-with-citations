@@ -43,6 +43,11 @@ def format_classification_prompt(query: str) -> str:
 def build_context_str(results: List[Dict]) -> str:
     context_parts = []
     for res in results:
-        # Format: [doc_id] Content...
-        context_parts.append(f"[{res['doc_id']}] {res['snippet']}")
+        doc_id = res.get("doc_id")
+        snippet = res.get("snippet")
+        # Skip results with missing identity — they pollute the LLM context
+        # with "[None] None" and can cause false citation matches downstream.
+        if not doc_id or not snippet:
+            continue
+        context_parts.append(f"[{doc_id}] {snippet}")
     return "\n\n".join(context_parts)

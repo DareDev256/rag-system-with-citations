@@ -72,26 +72,56 @@ class TestCalculateConfidenceEdgeCases:
     def test_empty_cited_ids_set(self):
         assert calculate_confidence("Answer.", self._r("d1"), set()) == 0.3
 
+    def test_none_doc_id_excluded_from_available(self):
+        """None doc_ids filtered out — prevents false [None] citation matches."""
+        results = [{"doc_id": None}, {"doc_id": "d1"}]
+        conf = calculate_confidence("[d1]", results, {"d1"})
+        assert conf == 1.0  # 1 valid cited / 1 valid available (None excluded)
+
+    def test_all_none_doc_ids_returns_low_confidence(self):
+        """If all doc_ids are None, no valid citations possible → 0.3."""
+        results = [{"doc_id": None}, {"doc_id": None}]
+        conf = calculate_confidence("[None]", results, {"None"})
+        assert conf == 0.3  # None filtered → available_ids is empty → no valid match
+
 
 # ── build_context_str: edge cases ────────────────────────────────
 
 class TestBuildContextStrEdgeCases:
-    def test_missing_doc_id_key_raises_keyerror(self):
-        with pytest.raises(KeyError):
-            build_context_str([{"snippet": "text only"}])
+    def test_missing_doc_id_key_skipped(self):
+        """Results without doc_id are dropped — no KeyError, no '[None]' pollution."""
+        assert build_context_str([{"snippet": "text only"}]) == ""
 
-    def test_missing_snippet_key_raises_keyerror(self):
-        with pytest.raises(KeyError):
-            build_context_str([{"doc_id": "doc_001"}])
+    def test_missing_snippet_key_skipped(self):
+        """Results without snippet are dropped — can't contribute useful context."""
+        assert build_context_str([{"doc_id": "doc_001"}]) == ""
 
     def test_unicode_in_snippets(self):
         assert build_context_str([{"doc_id": "d1", "snippet": "日本語テキスト"}]) == "[d1] 日本語テキスト"
 
-    def test_none_values_become_string_none(self):
-        assert build_context_str([{"doc_id": None, "snippet": None}]) == "[None] None"
+    def test_none_values_skipped(self):
+        """None doc_id/snippet results are silently dropped instead of becoming '[None] None'."""
+        assert build_context_str([{"doc_id": None, "snippet": None}]) == ""
 
-    def test_empty_snippet(self):
-        assert build_context_str([{"doc_id": "d1", "snippet": ""}]) == "[d1] "
+    def test_none_doc_id_with_valid_snippet_skipped(self):
+        assert build_context_str([{"doc_id": None, "snippet": "good text"}]) == ""
+
+    def test_valid_doc_id_with_none_snippet_skipped(self):
+        assert build_context_str([{"doc_id": "d1", "snippet": None}]) == ""
+
+    def test_mixed_valid_and_none_results(self):
+        """Valid results kept, None results dropped — no gaps in context."""
+        results = [
+            {"doc_id": None, "snippet": "orphaned"},
+            {"doc_id": "d1", "snippet": "good"},
+            {"doc_id": "d2", "snippet": None},
+        ]
+        output = build_context_str(results)
+        assert output == "[d1] good"
+
+    def test_empty_snippet_skipped(self):
+        """Empty string snippets are falsy — skipped to avoid '[d1] ' waste."""
+        assert build_context_str([{"doc_id": "d1", "snippet": ""}]) == ""
 
     def test_snippet_with_newlines(self):
         assert "line1\nline2" in build_context_str([{"doc_id": "d1", "snippet": "line1\nline2"}])

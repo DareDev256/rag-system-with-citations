@@ -108,15 +108,16 @@ def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set
     if not cited_ids:
         return 0.3
 
-    # Calculate citation coverage
-    available_ids = {res["doc_id"] for res in search_results}
+    # Calculate citation coverage — filter None doc_ids to prevent false matches
+    available_ids = {res["doc_id"] for res in search_results if res.get("doc_id")}
     valid_citations = cited_ids & available_ids
 
     if not valid_citations:
         return 0.3  # Citations don't match available docs
 
-    # Base confidence from citation ratio
-    citation_ratio = len(valid_citations) / len(search_results)
+    # Base confidence from citation ratio — use available_ids (not search_results)
+    # so broken metadata entries with None doc_ids don't deflate the score.
+    citation_ratio = len(valid_citations) / len(available_ids)
 
     # Scale: at least 1 citation = 0.6, all cited = 1.0
     confidence = 0.6 + (0.4 * citation_ratio)
@@ -149,10 +150,10 @@ def _parse_synthesis(response, search_results: List[Dict]) -> Dict[str, Any]:
     """Parse LLM synthesis response into answer dict with citations and confidence."""
     answer = response.choices[0].message.content.strip()
 
-    available_ids = {res["doc_id"] for res in search_results}
+    available_ids = {res["doc_id"] for res in search_results if res.get("doc_id")}
     cited_ids = extract_cited_doc_ids(answer, available_ids)
 
-    citations_used = [res for res in search_results if res["doc_id"] in cited_ids]
+    citations_used = [res for res in search_results if res.get("doc_id") in cited_ids]
 
     # Fallback: include top result when LLM doesn't follow citation format
     if not citations_used and search_results:

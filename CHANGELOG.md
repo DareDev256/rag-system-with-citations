@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.1] - 2026-03-09
+
+### Fixed
+- **None doc_id/snippet propagation in LLM context (CWE-20)** — `build_context_str()` now skips search results with `None` or empty `doc_id`/`snippet` instead of formatting them as `[None] None`, which polluted the LLM's context window and could cause the model to cite `[None]` as a source
+- **`calculate_confidence` false matches on None doc_ids** — `available_ids` set now filters out `None` entries, preventing a `None` doc_id from matching a hallucinated `[None]` citation and inflating confidence scores
+- **`_parse_synthesis` same None-in-set issue** — `available_ids` and `citations_used` filtering now use `.get()` with truthiness check, consistent with the fix already applied to `calculate_citation_coverage` in v1.3.1
+- **Confidence denominator inflated by broken metadata** — `citation_ratio` now divides by `len(available_ids)` instead of `len(search_results)`, so entries with `None` doc_ids don't deflate confidence scores for well-cited answers
+
+### Added
+- 5 new tests: None doc_id/snippet skipping in `build_context_str` (3), None doc_id filtering in `calculate_confidence` (2) — 285 total
+
 ## [1.10.0] - 2026-03-09
 
 ### Security
