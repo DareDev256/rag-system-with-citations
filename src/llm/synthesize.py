@@ -24,7 +24,7 @@ _LLM_TIMEOUT = safe_int_env("LLM_TIMEOUT", 30, min_val=1)
 _llm_client = None
 _async_llm_client = None
 _sync_client_lock = threading.Lock()
-_async_client_lock = asyncio.Lock()
+_async_client_lock = None  # Lazy init — asyncio.Lock() requires a running event loop
 
 
 def _client_kwargs() -> dict:
@@ -59,9 +59,14 @@ def get_llm_client():
 
 
 async def get_async_llm_client():
-    global _async_llm_client
+    global _async_llm_client, _async_client_lock
     if _async_llm_client is not None:
         return _async_llm_client
+    # Lazy-init the lock inside the running event loop to avoid binding
+    # to a stale or non-existent loop at module import time (Python 3.10+
+    # deprecation → 3.12+ RuntimeError).
+    if _async_client_lock is None:
+        _async_client_lock = asyncio.Lock()
     async with _async_client_lock:
         if _async_llm_client is None:
             _async_llm_client = openai.AsyncOpenAI(**_client_kwargs(), timeout=_LLM_TIMEOUT)

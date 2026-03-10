@@ -39,7 +39,11 @@ class VectorStore:
         dim = len(embeddings[0])
         if self.index is None:
             self.create_index(dim)
-        
+        elif self.index.d != dim:
+            raise ValueError(
+                f"Embedding dimension {dim} does not match index dimension {self.index.d}"
+            )
+
         vectors = np.array(embeddings).astype('float32')
         # Normalize for Cosine Similarity (IndexFlatIP)
         faiss.normalize_L2(vectors)
@@ -57,7 +61,12 @@ class VectorStore:
     def search(self, query_vector: List[float], k: int = 3):
         if not self.index:
             return []
-        
+
+        if len(query_vector) != self.index.d:
+            raise ValueError(
+                f"Query dimension {len(query_vector)} does not match index dimension {self.index.d}"
+            )
+
         vector = np.array([query_vector]).astype('float32')
         faiss.normalize_L2(vector)
         

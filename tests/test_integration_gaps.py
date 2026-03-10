@@ -175,6 +175,7 @@ class TestGetAsyncLlmClient:
         import src.llm.synthesize as mod
         mod._llm_client = None
         mod._async_llm_client = None
+        mod._async_client_lock = None  # Reset lazy lock
 
     @pytest.mark.asyncio
     @patch("src.llm.synthesize.openai.AsyncOpenAI")
@@ -247,16 +248,42 @@ class TestSyncClientRaceSafety:
         mock_openai.assert_called_once()
 
 
+class TestAsyncLockLazyInit:
+    """Regression: asyncio.Lock() at module level crashes on Python 3.10+."""
+
+    def setup_method(self):
+        import src.llm.synthesize as mod
+        mod._async_llm_client = None
+        mod._async_client_lock = None
+
+    def teardown_method(self):
+        import src.llm.synthesize as mod
+        mod._async_llm_client = None
+        mod._async_client_lock = None
+
+    @pytest.mark.asyncio
+    @patch("src.llm.synthesize.openai.AsyncOpenAI")
+    @patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test"}.get(k))
+    async def test_lock_created_lazily_inside_event_loop(self, mock_env, mock_async):
+        """Lock must be None before first call and an asyncio.Lock after."""
+        import src.llm.synthesize as mod
+        assert mod._async_client_lock is None
+        await mod.get_async_llm_client()
+        assert isinstance(mod._async_client_lock, asyncio.Lock)
+
+
 class TestAsyncClientRaceSafety:
     """Concurrent asyncio tasks must not create duplicate async OpenAI clients."""
 
     def setup_method(self):
         import src.llm.synthesize as mod
         mod._async_llm_client = None
+        mod._async_client_lock = None
 
     def teardown_method(self):
         import src.llm.synthesize as mod
         mod._async_llm_client = None
+        mod._async_client_lock = None
 
     @pytest.mark.asyncio
     @patch("src.llm.synthesize.openai.AsyncOpenAI")

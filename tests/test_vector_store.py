@@ -48,7 +48,7 @@ class TestAddDocuments:
     @patch("src.retrieval.vector_store.faiss.normalize_L2")
     @patch("src.retrieval.vector_store.faiss.IndexFlatIP")
     def test_adds_and_appends(self, mock_ip, mock_norm):
-        mock_ip.return_value = MagicMock()
+        mock_ip.return_value = MagicMock(d=2)
         vs = VectorStore()
         vs.add_documents([[0.1, 0.2]], [{"doc_id": "a"}])
         vs.add_documents([[0.3, 0.4]], [{"doc_id": "b"}])
@@ -102,6 +102,41 @@ class TestSaveIndex:
         assert mock_json.call_args[0][0] == []
 
 
+class TestDimensionValidation:
+    """Regression: dimension mismatches caused cryptic FAISS crashes."""
+
+    @patch("src.retrieval.vector_store.faiss.normalize_L2")
+    @patch("src.retrieval.vector_store.faiss.IndexFlatIP")
+    def test_add_mismatched_dimension_raises(self, mock_ip, mock_norm):
+        mock_index = MagicMock()
+        mock_index.d = 3
+        mock_ip.return_value = mock_index
+        vs = VectorStore()
+        vs.add_documents([[0.1, 0.2, 0.3]], [{"doc_id": "a"}])
+        with pytest.raises(ValueError, match="dimension 2.*dimension 3"):
+            vs.add_documents([[0.1, 0.2]], [{"doc_id": "b"}])
+
+    @patch("src.retrieval.vector_store.faiss.normalize_L2")
+    def test_search_mismatched_dimension_raises(self, mock_norm):
+        vs = VectorStore()
+        fake_index = MagicMock()
+        fake_index.d = 3
+        vs.index = fake_index
+        with pytest.raises(ValueError, match="dimension 2.*dimension 3"):
+            vs.search([0.1, 0.2])
+
+    @patch("src.retrieval.vector_store.faiss.normalize_L2")
+    @patch("src.retrieval.vector_store.faiss.IndexFlatIP")
+    def test_add_matching_dimension_succeeds(self, mock_ip, mock_norm):
+        mock_index = MagicMock()
+        mock_index.d = 2
+        mock_ip.return_value = mock_index
+        vs = VectorStore()
+        vs.add_documents([[0.1, 0.2]], [{"doc_id": "a"}])
+        vs.add_documents([[0.3, 0.4]], [{"doc_id": "b"}])
+        assert len(vs.metadata) == 2
+
+
 class TestSearch:
     def test_no_index_returns_empty(self):
         assert VectorStore().search([0.1, 0.2]) == []
@@ -113,7 +148,7 @@ class TestSearch:
             {"doc_id": "d1", "text": "first", "source": "a.txt"},
             {"doc_id": "d2", "text": "second", "source": "b.txt"},
         ]
-        fake_index = MagicMock()
+        fake_index = MagicMock(d=2)
         fake_index.search.return_value = (
             np.array([[0.95, 0.80]]), np.array([[0, 1]]),
         )
@@ -127,7 +162,7 @@ class TestSearch:
     def test_skips_invalid_and_out_of_range_indices(self, mock_norm):
         vs = VectorStore()
         vs.metadata = [{"doc_id": "d1", "text": "only", "source": "a.txt"}]
-        fake_index = MagicMock()
+        fake_index = MagicMock(d=1)
         fake_index.search.return_value = (
             np.array([[0.9, 0.5, 0.3]]), np.array([[0, -1, 99]]),
         )

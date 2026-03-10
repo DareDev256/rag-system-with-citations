@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.3] - 2026-03-10
+
+### Fixed
+- **asyncio.Lock() at module level (CWE-362)** — `_async_client_lock` was created at import time outside a running event loop, which raises `DeprecationWarning` on Python 3.10+ and `RuntimeError` on Python 3.12+; now lazily initialized inside `get_async_llm_client()` on first call
+- **FAISS dimension mismatch crashes** — `add_documents()` and `search()` now validate embedding/query vector dimensions against `index.d` before calling FAISS, converting cryptic C++ segfaults into clear `ValueError` messages
+
+### Added
+- 4 new regression tests: lazy async lock initialization (1), dimension mismatch in add/search (2), matching dimension success (1) — 317 total
+
 ## [1.10.2] - 2026-03-10
 
 ### Added

@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-313 tests across 11 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, response builders, and integration tests:
+317 tests across 11 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, response builders, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -174,9 +174,9 @@ pytest tests/ -v
 | `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
 | `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
 | `test_api.py` | 14 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, diagnostics opt-in, hallucination detection |
-| `test_vector_store.py` | 14 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search |
+| `test_vector_store.py` | 17 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search, dimension mismatch validation |
 | `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
-| `test_integration_gaps.py` | 17 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks) |
+| `test_integration_gaps.py` | 18 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks), lazy async lock initialization |
 | `test_response_builders.py` | 28 | Response assembly unit tests — `build_citations` sanitization, `build_diagnostics` coverage/hallucination math, `_parse_classification` fallback, `_parse_synthesis` citation filtering and fallback |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
