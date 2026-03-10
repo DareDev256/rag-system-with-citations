@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.2] - 2026-03-10
+
+### Added
+- **Unit tests for response builders** — 28 new tests covering `build_citations()`, `build_diagnostics()`, `_sanitize_field()`, `_parse_classification()`, and `_parse_synthesis()` — all previously untested at the unit level
+- Tests for: sanitizer application to corpus fields, None/missing source handling, hallucination detection & sorting, citation coverage math, timing rounding, LLM classification fallback on unknown/empty categories, synthesis fallback to top result, None doc_id filtering in synthesis — 313 total
+
 ## [1.10.1] - 2026-03-09
 
 ### Fixed
