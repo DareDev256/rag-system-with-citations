@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-317 tests across 11 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, response builders, and integration tests:
+334 tests across 12 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, response builders, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -178,6 +178,7 @@ pytest tests/ -v
 | `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
 | `test_integration_gaps.py` | 18 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks), lazy async lock initialization |
 | `test_response_builders.py` | 28 | Response assembly unit tests — `build_citations` sanitization, `build_diagnostics` coverage/hallucination math, `_parse_classification` fallback, `_parse_synthesis` citation filtering and fallback |
+| `test_middleware.py` | 17 | MaxBodySizeMiddleware (oversized/invalid Content-Length, GET bypass, boundary values), RequestIDMiddleware (auto-generation, passthrough, control-char rejection), global exception handler (stack trace suppression, request ID in 500s, security headers on errors) |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.

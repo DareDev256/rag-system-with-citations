@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.10.4] - 2026-03-10
+
+### Added
+- **Middleware test suite** — 17 new tests in `test_middleware.py` covering the three security-critical middleware layers that had zero dedicated tests:
+  - `MaxBodySizeMiddleware` (7 tests): oversized payload rejection (413), invalid Content-Length (400), GET bypass, boundary values at exact limit and limit+1
+  - `RequestIDMiddleware` (6 tests): auto-generation when missing, client ID passthrough, oversized/control-char/empty ID rejection, 64-char boundary acceptance
+  - Global exception handler (4 tests): stack trace suppression (CWE-209), request ID inclusion in 500s, security headers on error responses, file path leak prevention
+- 334 tests total across 12 test suites
+
 ## [1.10.3] - 2026-03-10
 
 ### Fixed
