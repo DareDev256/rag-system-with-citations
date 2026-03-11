@@ -18,6 +18,7 @@ from src.api.response import build_citations, build_diagnostics
 from src.retrieval.search import perform_search
 from src.llm.synthesize import classify_query_async, synthesize_answer_async
 from src.utils.env import safe_int_env
+from src.utils.ip import resolve_client_ip
 
 # ─── Request Body Size Limit (CWE-400) ───────────────────────────
 # Pydantic validates field lengths AFTER the full body is buffered into memory.
@@ -140,7 +141,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.11.0",
+    version="1.12.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -258,7 +259,7 @@ async def query_endpoint(request: QueryRequest, req: Request):
         raise HTTPException(status_code=401, detail=auth_error)
 
     # Rate limit — protect OpenAI budget and prevent abuse
-    client_ip = req.client.host if req.client else "unknown"
+    client_ip = resolve_client_ip(req)
     if not _check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
 

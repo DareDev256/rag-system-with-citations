@@ -21,17 +21,20 @@ Client → [Rate Limiter] → [Input Validation] → [Security Headers]
 
 ## Defense Layers
 
-### 1. Rate Limiting (CWE-770)
+### 1. Rate Limiting (CWE-770) + Trusted Proxy IP Resolution (CWE-348)
 
-**Threat:** Unbounded `/query` requests drain the OpenAI API budget or DoS the service.
+**Threat:** Unbounded `/query` requests drain the OpenAI API budget or DoS the service. Behind a reverse proxy, `req.client.host` returns the proxy IP — collapsing all clients into one bucket and making rate limiting useless.
 
-**Implementation:** In-memory per-IP sliding window (`src/api/main.py`).
+**Implementation:** In-memory per-IP sliding window (`src/api/main.py`) with proxy-aware IP extraction (`src/utils/ip.py`).
 
 | Parameter | Default | Env Var | Description |
 |-----------|---------|---------|-------------|
 | Window | 60s | — | Fixed 1-minute sliding window |
 | Max requests | 30 | `RATE_LIMIT_RPM` | Requests per IP per window |
 | Max tracked IPs | 10,000 | — | Hard cap, stale IPs evicted (CWE-400) |
+| Trusted proxies | 0 | `TRUSTED_PROXY_COUNT` | Number of reverse proxies in front of the app |
+
+**Proxy IP extraction:** When `TRUSTED_PROXY_COUNT=N`, the real client IP is extracted from the Nth-from-right entry in `X-Forwarded-For`. Counting from the RIGHT prevents attacker-spoofed prefix entries from being trusted. Falls back to socket IP if the header is missing, too short, or contains an invalid IP.
 
 **Why in-memory?** Single-process deployment. For multi-worker scaling, swap to Redis-backed middleware.
 
@@ -177,8 +180,6 @@ The `Dockerfile` runs the application as a non-root user (`appuser`) with a heal
 
 | Gap | Risk | Mitigation Path |
 |-----|------|-----------------|
-| No API authentication | Any client can query | Add API key or JWT middleware |
-| No request body size limit | Large payloads consume memory | Add `--limit-request-body` to uvicorn |
 | No dependency pinning | Supply chain drift | Generate `requirements.lock` |
 | In-memory rate limiter | Resets on restart, per-worker only | Redis-backed rate limiter |
 | No audit log | Compliance gaps | Structured JSON logging to external sink |

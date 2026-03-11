@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-344 tests across 13 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, response builders, and integration tests:
+362 tests across 14 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, response builders, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -180,6 +180,7 @@ pytest tests/ -v
 | `test_response_builders.py` | 28 | Response assembly unit tests — `build_citations` sanitization, `build_diagnostics` coverage/hallucination math, `_parse_classification` fallback, `_parse_synthesis` citation filtering and fallback |
 | `test_middleware.py` | 17 | MaxBodySizeMiddleware (oversized/invalid Content-Length, GET bypass, boundary values), RequestIDMiddleware (auto-generation, passthrough, control-char rejection), global exception handler (stack trace suppression, request ID in 500s, security headers on errors) |
 | `test_auth.py` | 10 | API key authentication — Bearer token, X-API-Key header, missing/wrong/empty key rejection, public path bypass, auth-disabled passthrough, constant-time comparison verification |
+| `test_ip_resolution.py` | 18 | Trusted proxy IP extraction — disabled mode, single/double proxy, attacker spoofing, IPv6, invalid IPs, fallback behavior |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
@@ -201,6 +202,7 @@ Set via environment variables or `.env`:
 | `LLM_TIMEOUT` | `30` | Request timeout in seconds for OpenAI API calls |
 | `RATE_LIMIT_RPM` | `30` | Max requests per minute per IP on `/query` |
 | `MAX_BODY_BYTES` | `65536` | Maximum request body size in bytes (rejects with 413) |
+| `TRUSTED_PROXY_COUNT` | `0` | Number of reverse proxies in front of the app (enables X-Forwarded-For extraction) |
 
 All responses include `X-Request-ID` for security incident traceability. Pass your own via request header (max 64 chars) or one is auto-generated.
 
@@ -218,7 +220,7 @@ See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup gu
 
 ### Security
 
-13-layer defense-in-depth covering API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+14-layer defense-in-depth covering API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 

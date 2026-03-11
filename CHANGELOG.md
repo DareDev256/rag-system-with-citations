@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.12.0] - 2026-03-11
+
+### Security
+- **Trusted proxy IP resolution (CWE-348)** — rate limiting previously used `req.client.host` which returns the proxy IP behind a reverse proxy (nginx, ALB, Cloudflare), collapsing all clients into one rate-limit bucket and making rate limiting useless. New `TRUSTED_PROXY_COUNT` env var enables extraction of real client IPs from `X-Forwarded-For` by counting from the right (attacker-resistant). Falls back to socket IP when disabled (default 0) or when header is malformed.
+- **Security doc gap table updated** — removed stale entries for API auth and body size limit (both fixed in v1.10.0+)
+
+### Added
+- `src/utils/ip.py` — `resolve_client_ip()` with IP validation, proxy count bounds checking, and IPv6 support
+- 18 new tests in `test_ip_resolution.py` — proxy disabled/enabled modes, single/double proxy, attacker spoofing resistance, IPv6, invalid IP fallback
+- 362 tests total across 14 test suites
+
 ## [1.11.0] - 2026-03-10
 
 ### Security
