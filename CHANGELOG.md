@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.11.0] - 2026-03-10
+
+### Security
+- **API key authentication (CWE-862)** — opt-in via `API_KEYS` env var (comma-separated). When set, all `POST /query` requests require a valid key via `Authorization: Bearer <key>` or `X-API-Key: <key>` header. Uses `hmac.compare_digest` for constant-time comparison to prevent timing attacks (CWE-208). Public paths (`/health`, `/docs`) remain unauthenticated.
+
+### Added
+- 10 new auth tests in `test_auth.py` — Bearer token acceptance, X-API-Key header, missing/wrong/empty key rejection, public path bypass, auth-disabled passthrough, constant-time comparison structural check
+- 344 tests total across 13 test suites
+
 ## [1.10.4] - 2026-03-10
 
 ### Added

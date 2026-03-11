@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-334 tests across 12 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, response builders, and integration tests:
+344 tests across 13 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, response builders, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -179,6 +179,7 @@ pytest tests/ -v
 | `test_integration_gaps.py` | 18 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks), lazy async lock initialization |
 | `test_response_builders.py` | 28 | Response assembly unit tests — `build_citations` sanitization, `build_diagnostics` coverage/hallucination math, `_parse_classification` fallback, `_parse_synthesis` citation filtering and fallback |
 | `test_middleware.py` | 17 | MaxBodySizeMiddleware (oversized/invalid Content-Length, GET bypass, boundary values), RequestIDMiddleware (auto-generation, passthrough, control-char rejection), global exception handler (stack trace suppression, request ID in 500s, security headers on errors) |
+| `test_auth.py` | 10 | API key authentication — Bearer token, X-API-Key header, missing/wrong/empty key rejection, public path bypass, auth-disabled passthrough, constant-time comparison verification |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
@@ -190,6 +191,7 @@ Set via environment variables or `.env`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | — | Required. Your OpenAI API key (or proxy key) |
+| `API_KEYS` | — | Optional. Comma-separated API keys for `/query` authentication (CWE-862) |
 | `OPENAI_BASE_URL` | — | Optional. Route LLM calls through any OpenAI-compatible proxy |
 | `SYNTHESIS_MODEL` | `gpt-4o-mini` | Model for answer generation |
 | `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Model for query classification |
@@ -216,7 +218,7 @@ See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup gu
 
 ### Security
 
-12-layer defense-in-depth covering rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+13-layer defense-in-depth covering API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 

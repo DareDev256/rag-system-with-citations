@@ -1,6 +1,7 @@
 from collections import defaultdict
 from contextlib import asynccontextmanager
 
+import hmac
 import logging
 import os
 import re
@@ -83,6 +84,41 @@ def _evict_stale_ips(now: float) -> None:
         del _rate_store[ip]
 
 
+# ─── API Key Authentication (CWE-862) ────────────────────────────────
+# Without authentication, any client can call /query and burn through the
+# OpenAI budget. Opt-in via API_KEYS env var (comma-separated).
+# When set, all POST /query requests must include a valid key via
+# Authorization: Bearer <key> or X-API-Key: <key> header.
+# Uses hmac.compare_digest for constant-time comparison (CWE-208).
+_API_KEYS: set = set()
+_raw_keys = os.getenv("API_KEYS", "").strip()
+if _raw_keys:
+    _API_KEYS = {k.strip() for k in _raw_keys.split(",") if k.strip()}
+    logger.info("API key auth enabled (%d key(s) loaded)", len(_API_KEYS))
+
+# Paths that never require authentication
+_PUBLIC_PATHS = {"/health", "/docs", "/redoc", "/openapi.json"}
+
+
+def _authenticate(request: Request) -> str | None:
+    """Return an error message if auth fails, None if OK."""
+    if not _API_KEYS:
+        return None  # Auth not configured — open access
+    if request.url.path in _PUBLIC_PATHS or request.method == "GET":
+        return None  # Public endpoints skip auth
+    # Check Authorization: Bearer <key>
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header[7:]
+        if any(hmac.compare_digest(token, k) for k in _API_KEYS):
+            return None
+    # Check X-API-Key header as fallback
+    api_key = request.headers.get("x-api-key", "")
+    if api_key and any(hmac.compare_digest(api_key, k) for k in _API_KEYS):
+        return None
+    return "Invalid or missing API key."
+
+
 # ─── Output sanitization ─────────────────────────────────────────────
 # LLM responses are untrusted — strip control chars before returning to client.
 # Input is already sanitized for logging, but output was trusted blindly.
@@ -104,7 +140,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.10.4",
+    version="1.11.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -216,6 +252,11 @@ async def health():
 
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(request: QueryRequest, req: Request):
+    # Authenticate — reject unauthorized callers before burning any compute
+    auth_error = _authenticate(req)
+    if auth_error:
+        raise HTTPException(status_code=401, detail=auth_error)
+
     # Rate limit — protect OpenAI budget and prevent abuse
     client_ip = req.client.host if req.client else "unknown"
     if not _check_rate_limit(client_ip):
