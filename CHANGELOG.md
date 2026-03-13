@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.12.1] - 2026-03-13
+
+### Added
+- **Resilience test suite** — 16 new tests in `test_resilience.py` targeting production failure modes that happy-path tests miss:
+  - `TestLoadIndexCorruption` (5 tests): corrupted JSON metadata, truncated FAISS binary, permission denied, OS-level I/O errors, null JSON edge case
+  - `TestSaveIndexFailures` (3 tests): disk-full on FAISS write, permission denied on metadata write, non-serializable metadata detection
+  - `TestSearchMetadataEdgeCases` (4 tests): metadata with missing keys, k > index size padding, zero-score results, negative FAISS scores
+  - `TestAddDocumentsEdgeCases` (2 tests): metadata count tracking across sequential adds, single-doc index auto-creation
+  - `TestSearchEngineSingleton` (2 tests): successful init caching, singleton poisoning prevention on load failure
+- 378 tests total across 15 test suites
+
 ## [1.12.0] - 2026-03-11
 
 ### Security
