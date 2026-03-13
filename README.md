@@ -160,7 +160,7 @@ Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
 
 ## Testing
 
-378 tests across 15 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, response builders, resilience, and integration tests:
+399 tests across 16 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, input validation, response builders, resilience, and integration tests:
 
 ```bash
 pytest tests/ -v
@@ -182,6 +182,7 @@ pytest tests/ -v
 | `test_auth.py` | 10 | API key authentication — Bearer token, X-API-Key header, missing/wrong/empty key rejection, public path bypass, auth-disabled passthrough, constant-time comparison verification |
 | `test_ip_resolution.py` | 18 | Trusted proxy IP extraction — disabled mode, single/double proxy, attacker spoofing, IPv6, invalid IPs, fallback behavior |
 | `test_resilience.py` | 16 | File I/O failure propagation (corrupted JSON, truncated FAISS, permission denied), save failure handling, metadata edge cases (missing keys, zero/negative scores), singleton poisoning prevention |
+| `test_input_validation.py` | 21 | Null byte rejection (CWE-138), control char blocking, whitespace-only query rejection, parameter pollution prevention (CWE-235), Content-Type enforcement (CWE-436), unicode passthrough |
 | `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
@@ -221,7 +222,7 @@ See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup gu
 
 ### Security
 
-14-layer defense-in-depth covering API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+17-layer defense-in-depth covering API key authentication, rate limiting, input validation (null byte rejection, control char blocking, parameter pollution prevention, Content-Type enforcement), output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 
