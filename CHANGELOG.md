@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.12.2] - 2026-03-13
+
+### Changed
+- **Portfolio-grade README rewrite** — restructured for visual impact and scannability:
+  - Added badge row (Python, FastAPI, FAISS, test count, security layers)
+  - New full-system architecture diagram showing security perimeter around the pipeline
+  - Security promoted to first-class section with 14-layer CWE mapping table
+  - Test table sorted by count (descending) for quick impact assessment
+  - Design decisions refactored into comparison table with rationale and trade-offs
+  - API examples consolidated with auth header usage
+  - Project structure updated to reflect `ip.py` and JSON metadata migration
+
 ## [1.12.1] - 2026-03-13
 
 ### Added

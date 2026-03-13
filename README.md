@@ -1,118 +1,115 @@
 # RAG System with Citations
 
-A production-ready Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations and real-time confidence scoring.
+![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
+![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-378_passing-2ea44f?style=flat-square)
+![Security](https://img.shields.io/badge/defense_layers-14-e05d44?style=flat-square&logo=shield)
 
-Built with **FastAPI** + **FAISS** + **OpenAI**, designed to minimize hallucinations through citation-enforced prompting and smart confidence metrics.
+A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 14-layer defense-in-depth security.
 
-## Why This Exists
+**Every answer must cite its sources. If it can't, the confidence score reflects that.**
 
-Standard LLM APIs hallucinate. This system forces every answer to cite its sources — and scores confidence based on how well the answer is grounded in retrieved documents. If the model can't back up its claims, the confidence score reflects that.
+---
+
+## The Problem
+
+Standard LLM APIs hallucinate freely and report high confidence regardless. This system forces citation-backed answers and scores confidence based on actual grounding — not vibes.
+
+## Key Features
+
+- **Citation-enforced answers** — LLM must reference `[doc_id]` from retrieved context or confidence drops to 0.3
+- **Real confidence scoring** — calculated from citation coverage ratio, not model self-assessment
+- **Hallucination detection** — flags citations that reference documents not in the retrieval set
+- **14-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing
+- **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
+- **378 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
 ```
-                    ┌─────────────┐
-                    │  POST /query │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Classify   │  ← GPT-4o-mini determines query type
-                    │  Query      │    (factual / exploratory / ambiguous)
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Retrieve   │  ← FAISS similarity search (Top-K)
-                    │  Context    │    Sentence Transformers embeddings
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Synthesize │  ← GPT-4o-mini generates answer
-                    │  Answer     │    with enforced [doc_id] citations
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │  Score &    │  ← Real confidence based on
-                    │  Validate   │    citation coverage + grounding
-                    └─────────────┘
+  Request                           Security Perimeter
+    │                    ┌──────────────────────────────────────────┐
+    ▼                    │                                          │
+┌────────┐  ┌───────────┤──────┐  ┌──────────┐  ┌──────────────┐  │
+│ Client ├─►│ Rate Limit │ Auth │─►│ Body     │─►│ Request ID   │  │
+└────────┘  │ (per-IP)   │(key) │  │ Size Cap │  │ (X-Request-ID│) │
+            └────────────┴──────┘  └────┬─────┘  └──────┬───────┘  │
+                                        │               │          │
+                                   ┌────▼───────────────▼──┐       │
+                                   │    POST /query         │       │
+                                   └───────────┬────────────┘       │
+                                               │                    │
+                    ┌──────────────────────────┼────────────────┐   │
+                    │  Pipeline                │                │   │
+                    │  ┌───────────┐  ┌────────▼───────┐       │   │
+                    │  │ Classify  │◄─┤ GPT-4o-mini    │       │   │
+                    │  │ Query     │  │ (configurable) │       │   │
+                    │  └─────┬─────┘  └────────────────┘       │   │
+                    │        │                                  │   │
+                    │  ┌─────▼─────┐                            │   │
+                    │  │ FAISS     │  ← all-MiniLM-L6-v2       │   │
+                    │  │ Retrieve  │    similarity search       │   │
+                    │  └─────┬─────┘                            │   │
+                    │        │                                  │   │
+                    │  ┌─────▼─────┐  ┌────────────────┐       │   │
+                    │  │ Synthesize│─►│ Citation Check  │       │   │
+                    │  │ Answer    │  │ + Hallucination │       │   │
+                    │  └───────────┘  │   Detection     │       │   │
+                    │                 └────────┬────────┘       │   │
+                    └──────────────────────────┼────────────────┘   │
+                                               │                    │
+                                   ┌───────────▼────────────┐      │
+                                   │ Output Sanitization    │      │
+                                   │ + Security Headers     │      │
+                                   └───────────┬────────────┘      │
+                                               │                    │
+                                               ▼                    │
+                                        JSON Response               │
+                                   (answer + citations +            │
+                                    confidence + diagnostics)       │
+                                        └───────────────────────────┘
 ```
 
-**Data Flow:** Documents → Chunk → Embed (all-MiniLM-L6-v2) → FAISS Index → Query-time retrieval → LLM synthesis with citations → Confidence scoring
-
-## Project Structure
-
-```
-src/
-├── api/
-│   ├── main.py          # FastAPI app, /query and /health endpoints
-│   ├── response.py      # Citation and diagnostics response builders
-│   └── schemas.py       # Pydantic request/response models
-├── llm/
-│   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls (sync + async), citation extraction, confidence scoring
-├── retrieval/
-│   ├── embed.py         # Sentence Transformers embedder (singleton)
-│   ├── search.py        # Search orchestration layer
-│   └── vector_store.py  # FAISS index wrapper (load/save/search)
-├── eval/
-│   ├── evaluate.py      # Offline evaluation pipeline
-│   └── metrics.py       # Citation coverage + hallucination metrics
-├── data/
-│   ├── corpus/          # Source documents (.txt)
-│   └── ingest.py        # Document loading + chunking + indexing
-└── utils/
-    ├── env.py           # Safe environment variable parsing (int with bounds)
-    └── timing.py        # Latency measurement decorator
-```
+**Data flow:** Documents → Chunk → Embed (all-MiniLM-L6-v2) → FAISS Index → Query-time retrieval → LLM synthesis with enforced citations → Confidence scoring → Sanitized response
 
 ## Quick Start
 
 ```bash
 git clone https://github.com/DareDev256/rag-system-with-citations.git
 cd rag-system-with-citations
-python3 -m venv venv
-source venv/bin/activate
+python3 -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
 ```bash
 cp .env.example .env
-# Edit .env → set OPENAI_API_KEY=sk-...
+# Set OPENAI_API_KEY=sk-...
 ```
 
 ```bash
-python -m src.data.ingest     # Build the FAISS index
-uvicorn src.api.main:app --reload  # Start the API
+python -m src.data.ingest          # Build the FAISS index
+uvicorn src.api.main:app --reload  # Start the API → http://localhost:8000/docs
 ```
 
-API docs available at `http://localhost:8000/docs`
+## API
 
-## API Usage
-
-### Query
+### `POST /query`
 
 ```bash
-curl -X POST http://localhost:8000/query \
+# Basic query
+curl -s -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
   -d '{"query": "What is retrieval-augmented generation?"}'
-```
 
-Control retrieval depth with `k` (1–20, default 5):
-
-```bash
-curl -X POST http://localhost:8000/query \
+# With auth + retrieval depth + diagnostics
+curl -s -X POST http://localhost:8000/query \
   -H "Content-Type: application/json" \
-  -d '{"query": "How does FAISS indexing work?", "k": 3}'
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{"query": "How does FAISS indexing work?", "k": 3, "include_diagnostics": true}'
 ```
 
-Enable retrieval diagnostics with `include_diagnostics` for per-stage timing, citation coverage, and hallucination detection:
-
-```bash
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{"query": "What is RAG?", "include_diagnostics": true}'
-```
-
-### Response Format
+### Response
 
 ```json
 {
@@ -139,7 +136,7 @@ curl -X POST http://localhost:8000/query \
 }
 ```
 
-### Health Check
+### `GET /health`
 
 ```bash
 curl http://localhost:8000/health
@@ -147,81 +144,127 @@ curl http://localhost:8000/health
 
 ## Confidence Scoring
 
-The API returns a real `confidence` score (0.0–1.0) — not a random number, but a calculated metric based on how well the answer is grounded:
+Real metric, not model self-assessment:
 
-| Score | Meaning |
-|-------|---------|
-| **0.0** | No search results or error |
-| **0.1** | LLM refused to answer (appropriate when context is insufficient) |
-| **0.3** | Answer given but no citations used (potential hallucination) |
-| **0.6–1.0** | Answer with citations — scales with citation coverage ratio |
+| Score | Signal |
+|-------|--------|
+| `0.0` | No search results or pipeline error |
+| `0.1` | LLM refused to answer (context insufficient) |
+| `0.3` | Answer generated but zero citations (hallucination risk) |
+| `0.6–1.0` | Cited answer — scales with `0.6 + 0.4 × (cited_docs / retrieved_docs)` |
 
-Formula: `confidence = 0.6 + 0.4 × (cited_docs / retrieved_docs)`
+## Security
+
+14-layer defense-in-depth. Each layer maps to a specific CWE threat class:
+
+| Layer | Defense | CWE |
+|-------|---------|-----|
+| 1 | Rate limiting (per-IP sliding window) | CWE-770 |
+| 2 | Trusted proxy IP resolution | CWE-348 |
+| 3 | API key auth (constant-time comparison) | CWE-862 |
+| 4 | Request body size cap (413 before parse) | CWE-400 |
+| 5 | Input validation (Pydantic field constraints) | CWE-20 |
+| 6 | Request ID tracing | CWE-778 |
+| 7 | LLM timeout enforcement | CWE-400 |
+| 8 | FAISS path traversal guard | CWE-22 |
+| 9 | Output sanitization (answer + citations) | CWE-116 |
+| 10 | Security headers (CSP, HSTS, X-Frame-Options) | CWE-693 |
+| 11 | Error message sanitization (no stack traces) | CWE-209 |
+| 12 | Log injection prevention | CWE-117 |
+| 13 | Embedding model name validation | CWE-94 |
+| 14 | Non-root Docker container | CWE-250 |
+
+Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-378 tests across 15 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, response builders, resilience, and integration tests:
+378 tests across 15 suites. All mocked — runs without API keys, FAISS indexes, or network access.
 
 ```bash
 pytest tests/ -v
 ```
 
-| Suite | Tests | Coverage |
-|-------|-------|----------|
-| `test_core.py` | 50 | Context formatting, citation extraction, confidence scoring, schema validation, evaluation metrics, document loading, latency measurement |
-| `test_edge_cases.py` | 49 | Unicode, missing keys, boundary values, exception propagation, type coercion, hallucination rate |
-| `test_hardening.py` | 81 | Security headers, prompt injection resistance, file I/O resilience, `_client_kwargs` config, LLM timeout enforcement, error sanitization, control char stripping, HSTS validation, path traversal guard, rate limiting, output sanitization, LLM_TIMEOUT parsing, rate limiter memory exhaustion, global exception handler, request ID middleware, citation snippet sanitization, request body size limit, embedding model name validation |
-| `test_llm.py` | 14 | Mock-based `classify_query` and `synthesize_answer` — category fallback, citation parsing, error handling, hallucination filtering |
-| `test_llm_async.py` | 14 | Async variants of all LLM functions using `AsyncMock` — validates parity with sync implementations |
-| `test_api.py` | 14 | FastAPI `TestClient` — health endpoint, query happy path, validation errors (422), `k` parameter forwarding, diagnostics opt-in, hallucination detection |
-| `test_vector_store.py` | 17 | FAISS `VectorStore` wrapper — init, load/save index, add documents, create index, similarity search, dimension mismatch validation |
-| `test_search.py` | 19 | `Embedder` singleton behavior, model load failure recovery, configurable model, `get_search_engine` factory, `perform_search` orchestration |
-| `test_integration_gaps.py` | 18 | Environment validation, ingest pipeline, LLM client factories (sync + async), proxy base_url forwarding, race condition safety (concurrent threads + asyncio tasks), lazy async lock initialization |
-| `test_response_builders.py` | 28 | Response assembly unit tests — `build_citations` sanitization, `build_diagnostics` coverage/hallucination math, `_parse_classification` fallback, `_parse_synthesis` citation filtering and fallback |
-| `test_middleware.py` | 17 | MaxBodySizeMiddleware (oversized/invalid Content-Length, GET bypass, boundary values), RequestIDMiddleware (auto-generation, passthrough, control-char rejection), global exception handler (stack trace suppression, request ID in 500s, security headers on errors) |
-| `test_auth.py` | 10 | API key authentication — Bearer token, X-API-Key header, missing/wrong/empty key rejection, public path bypass, auth-disabled passthrough, constant-time comparison verification |
-| `test_ip_resolution.py` | 18 | Trusted proxy IP extraction — disabled mode, single/double proxy, attacker spoofing, IPv6, invalid IPs, fallback behavior |
-| `test_resilience.py` | 16 | File I/O failure propagation (corrupted JSON, truncated FAISS, permission denied), save failure handling, metadata edge cases (missing keys, zero/negative scores), singleton poisoning prevention |
-| `test_evaluation.py` | 13 | `run_evaluation` pipeline, keyword matching, CSV output, latency measurement, coverage forwarding |
-
-All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
+| Suite | Tests | Scope |
+|-------|------:|-------|
+| `test_hardening.py` | 81 | Security headers, prompt injection, rate limiting, error sanitization |
+| `test_core.py` | 50 | Citation extraction, confidence scoring, schema validation, metrics |
+| `test_edge_cases.py` | 49 | Unicode, boundary values, type coercion, hallucination edge cases |
+| `test_response_builders.py` | 28 | Citation assembly, diagnostics math, LLM output parsing |
+| `test_search.py` | 19 | Embedder singleton, search orchestration, model failure recovery |
+| `test_integration_gaps.py` | 18 | Lifespan, ingest pipeline, client factories, race conditions |
+| `test_ip_resolution.py` | 18 | Proxy extraction, spoofing resistance, IPv6, fallback |
+| `test_vector_store.py` | 17 | FAISS wrapper — load/save/search, dimension validation |
+| `test_middleware.py` | 17 | Body size, request ID, global exception handler |
+| `test_resilience.py` | 16 | File I/O failures, corrupted state, singleton poisoning |
+| `test_llm.py` | 14 | Sync LLM mocks — classification, synthesis, error handling |
+| `test_llm_async.py` | 14 | Async LLM mocks — parity with sync implementations |
+| `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
+| `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
+| `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
 
 ## Configuration
 
-Set via environment variables or `.env`:
+All settings via environment variables or `.env`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `OPENAI_API_KEY` | — | Required. Your OpenAI API key (or proxy key) |
-| `API_KEYS` | — | Optional. Comma-separated API keys for `/query` authentication (CWE-862) |
-| `OPENAI_BASE_URL` | — | Optional. Route LLM calls through any OpenAI-compatible proxy |
-| `SYNTHESIS_MODEL` | `gpt-4o-mini` | Model for answer generation |
-| `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Model for query classification |
-| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers model for embeddings |
-| `CSP_POLICY` | (strict default) | Override Content-Security-Policy header |
-| `HSTS_MAX_AGE` | `63072000` | HSTS max-age in seconds (default 2 years) |
-| `LLM_TIMEOUT` | `30` | Request timeout in seconds for OpenAI API calls |
-| `RATE_LIMIT_RPM` | `30` | Max requests per minute per IP on `/query` |
-| `MAX_BODY_BYTES` | `65536` | Maximum request body size in bytes (rejects with 413) |
-| `TRUSTED_PROXY_COUNT` | `0` | Number of reverse proxies in front of the app (enables X-Forwarded-For extraction) |
+| `OPENAI_API_KEY` | — | **Required.** OpenAI API key (or proxy key) |
+| `API_KEYS` | — | Comma-separated keys for `/query` auth |
+| `OPENAI_BASE_URL` | — | Route through any OpenAI-compatible proxy |
+| `SYNTHESIS_MODEL` | `gpt-4o-mini` | Answer generation model |
+| `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Query classification model |
+| `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers embedding model |
+| `LLM_TIMEOUT` | `30` | OpenAI request timeout (seconds) |
+| `RATE_LIMIT_RPM` | `30` | Max requests/min per IP |
+| `MAX_BODY_BYTES` | `65536` | Request body size limit (413 on exceed) |
+| `TRUSTED_PROXY_COUNT` | `0` | Reverse proxies for X-Forwarded-For extraction |
+| `CSP_POLICY` | strict default | Content-Security-Policy override |
+| `HSTS_MAX_AGE` | `63072000` | HSTS max-age (seconds) |
 
-All responses include `X-Request-ID` for security incident traceability. Pass your own via request header (max 64 chars) or one is auto-generated.
+Every response includes `X-Request-ID` for incident traceability (auto-generated or pass your own, max 64 chars).
 
-### Using Alternative LLM Providers
+### Alternative LLM Providers
 
-Any OpenAI-compatible proxy works as a drop-in backend — Anthropic (via LiteLLM), Qwen (via vLLM), local models (via Ollama):
+Any OpenAI-compatible backend works as a drop-in replacement:
 
 ```bash
-# Example: route through LiteLLM to use Claude
+# Claude via LiteLLM
 export OPENAI_BASE_URL=http://localhost:4000/v1
 export SYNTHESIS_MODEL=claude-sonnet-4-20250514
+
+# Local models via Ollama
+export OPENAI_BASE_URL=http://localhost:11434/v1
+export SYNTHESIS_MODEL=llama3
 ```
 
-See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full setup guides (LiteLLM, OpenRouter, Ollama, vLLM).
+See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full guides (LiteLLM, OpenRouter, Ollama, vLLM).
 
-### Security
+## Project Structure
 
-14-layer defense-in-depth covering API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+```
+src/
+├── api/
+│   ├── main.py          # FastAPI app, middleware stack, /query + /health
+│   ├── response.py      # Citation assembly + diagnostics builders
+│   └── schemas.py       # Pydantic request/response models
+├── llm/
+│   ├── prompt.py        # RAG + classification prompt templates
+│   └── synthesize.py    # LLM calls (sync + async), confidence scoring
+├── retrieval/
+│   ├── embed.py         # Sentence Transformers embedder (singleton)
+│   ├── search.py        # Search orchestration layer
+│   └── vector_store.py  # FAISS index wrapper (JSON metadata, not pickle)
+├── eval/
+│   ├── evaluate.py      # Offline evaluation pipeline
+│   └── metrics.py       # Citation coverage + hallucination metrics
+├── data/
+│   ├── corpus/          # Source documents (.txt)
+│   └── ingest.py        # Document loading + chunking + indexing
+└── utils/
+    ├── env.py           # Safe env var parsing (bounded int)
+    ├── ip.py            # Trusted proxy IP resolution
+    └── timing.py        # Latency measurement decorator
+```
 
 ## Docker
 
@@ -230,9 +273,9 @@ docker build -t rag-citations .
 docker run -p 8000:8000 --env-file .env rag-citations
 ```
 
-## Evaluation
+Runs as non-root `appuser`. Healthcheck built in.
 
-Run the offline evaluation suite:
+## Evaluation
 
 ```bash
 python -m src.eval.evaluate
@@ -240,15 +283,18 @@ python -m src.eval.evaluate
 
 Results saved to `reports/eval_results.csv`.
 
-## Trade-offs & Design Decisions
+## Design Decisions
 
-- **FAISS in-memory** — Simple and fast for prototyping. For production scale, swap to pgvector or Pinecone.
-- **OpenAI dependency** — Chosen for output quality. Could swap to local models via Ollama for cost/latency trade-offs.
-- **Sync FAISS + Async LLM** — FAISS search is CPU-bound and fast enough synchronously. LLM calls are async to avoid blocking the event loop.
-- **Citation-first design** — The system prioritizes verifiable answers over fluent ones. If the LLM doesn't cite sources, confidence drops to 0.3.
+| Decision | Rationale | Trade-off |
+|----------|-----------|-----------|
+| FAISS in-memory | Fast, zero-config for prototyping | Swap to pgvector/Pinecone for scale |
+| OpenAI default | Best output quality for citations | Configurable — swap via env var |
+| Sync FAISS + Async LLM | FAISS is CPU-bound and fast; LLM is I/O-bound | Async FAISS unnecessary at this scale |
+| Citation-first | Verifiable > fluent — no citation = low confidence | May reject valid answers that paraphrase |
+| JSON metadata (not pickle) | Eliminates deserialization attacks (CWE-502) | Slightly more verbose storage |
 
 ## Requirements
 
 - Python 3.9+
-- OpenAI API key
+- OpenAI API key (or compatible proxy)
 - Docker (optional)
