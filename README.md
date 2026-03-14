@@ -244,7 +244,8 @@ See **[docs/proxy-integration.md](docs/proxy-integration.md)** for full guides (
 ```
 src/
 ├── api/
-│   ├── main.py          # FastAPI app, middleware stack, /query + /health
+│   ├── main.py          # FastAPI app, endpoint orchestration, /query + /health
+│   ├── middleware.py     # Rate limiter, auth, security headers, body size, request ID
 │   ├── response.py      # Citation assembly + diagnostics builders
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/

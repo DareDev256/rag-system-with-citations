@@ -1,134 +1,31 @@
-from collections import defaultdict
-from contextlib import asynccontextmanager
-
-import hmac
 import logging
 import os
 import re
 import time
-import uuid
+
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
+from src.api.middleware import (
+    MaxBodySizeMiddleware,
+    RequestIDMiddleware,
+    SecurityHeadersMiddleware,
+    apply_security_headers,
+    authenticate,
+    check_rate_limit,
+    sanitize_output,
+)
 from src.api.schemas import QueryRequest, QueryResponse
 from src.api.response import build_citations, build_diagnostics
 from src.retrieval.search import perform_search
 from src.llm.synthesize import classify_query_async, synthesize_answer_async
-from src.utils.env import safe_int_env
 from src.utils.ip import resolve_client_ip
-
-# ─── Request Body Size Limit (CWE-400) ───────────────────────────
-# Pydantic validates field lengths AFTER the full body is buffered into memory.
-# Without an early size check, an attacker can POST multi-MB payloads that
-# exhaust memory before validation ever fires — bypassing rate limiting too.
-_MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024)
-
-
-class MaxBodySizeMiddleware(BaseHTTPMiddleware):
-    """Reject requests with bodies exceeding _MAX_BODY_BYTES before parsing."""
-
-    async def dispatch(self, request: Request, call_next):
-        if request.method in ("POST", "PUT", "PATCH"):
-            content_length = request.headers.get("content-length")
-            if content_length:
-                try:
-                    if int(content_length) > _MAX_BODY_BYTES:
-                        return JSONResponse(
-                            status_code=413,
-                            content={"detail": "Request body too large."},
-                        )
-                except ValueError:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"detail": "Invalid Content-Length header."},
-                    )
-        return await call_next(request)
 
 # Logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
-
-
-# ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────
-# Each /query call costs real money (OpenAI API). Without rate limiting,
-# any client can drain the budget or DoS the service. CWE-770.
-_RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1)
-_MAX_TRACKED_IPS = 10_000  # cap to prevent memory exhaustion from IP rotation attacks
-_rate_store: dict = defaultdict(list)  # IP -> list of timestamps
-
-
-def _check_rate_limit(client_ip: str) -> bool:
-    """Return True if request is allowed, False if rate-limited."""
-    now = time.monotonic()
-    window = now - 60  # 1-minute sliding window
-    # Prune expired entries
-    _rate_store[client_ip] = [t for t in _rate_store[client_ip] if t > window]
-    if len(_rate_store[client_ip]) >= _RATE_LIMIT:
-        return False
-    _rate_store[client_ip].append(now)
-    # Evict stale IPs to prevent unbounded memory growth (CWE-400).
-    # An attacker rotating through IPs creates keys that linger forever
-    # even after their timestamp lists empty out.
-    if len(_rate_store) > _MAX_TRACKED_IPS:
-        _evict_stale_ips(now)
-    return True
-
-
-def _evict_stale_ips(now: float) -> None:
-    """Remove IPs with no recent requests from the rate store."""
-    window = now - 60
-    stale = [ip for ip, ts in _rate_store.items() if not ts or ts[-1] <= window]
-    for ip in stale:
-        del _rate_store[ip]
-
-
-# ─── API Key Authentication (CWE-862) ────────────────────────────────
-# Without authentication, any client can call /query and burn through the
-# OpenAI budget. Opt-in via API_KEYS env var (comma-separated).
-# When set, all POST /query requests must include a valid key via
-# Authorization: Bearer <key> or X-API-Key: <key> header.
-# Uses hmac.compare_digest for constant-time comparison (CWE-208).
-_API_KEYS: set = set()
-_raw_keys = os.getenv("API_KEYS", "").strip()
-if _raw_keys:
-    _API_KEYS = {k.strip() for k in _raw_keys.split(",") if k.strip()}
-    logger.info("API key auth enabled (%d key(s) loaded)", len(_API_KEYS))
-
-# Paths that never require authentication
-_PUBLIC_PATHS = {"/health", "/docs", "/redoc", "/openapi.json"}
-
-
-def _authenticate(request: Request) -> str | None:
-    """Return an error message if auth fails, None if OK."""
-    if not _API_KEYS:
-        return None  # Auth not configured — open access
-    if request.url.path in _PUBLIC_PATHS or request.method == "GET":
-        return None  # Public endpoints skip auth
-    # Check Authorization: Bearer <key>
-    auth_header = request.headers.get("authorization", "")
-    if auth_header.startswith("Bearer "):
-        token = auth_header[7:]
-        if any(hmac.compare_digest(token, k) for k in _API_KEYS):
-            return None
-    # Check X-API-Key header as fallback
-    api_key = request.headers.get("x-api-key", "")
-    if api_key and any(hmac.compare_digest(api_key, k) for k in _API_KEYS):
-        return None
-    return "Invalid or missing API key."
-
-
-# ─── Output sanitization ─────────────────────────────────────────────
-# LLM responses are untrusted — strip control chars before returning to client.
-# Input is already sanitized for logging, but output was trusted blindly.
-_CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
-
-
-def _sanitize_output(text: str) -> str:
-    """Strip C0 control chars from LLM output (preserves \\n, \\r, \\t)."""
-    return _CONTROL_CHAR_RE.sub('', text)
 
 
 @asynccontextmanager
@@ -141,100 +38,20 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.13.1",
+    version="1.14.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
 )
 
 
-# Default CSP — override via CSP_POLICY env var for proxied/Swagger environments
-_DEFAULT_CSP = (
-    "default-src 'self'; "
-    "script-src 'self'; "
-    "style-src 'self'; "
-    "img-src 'self' data:; "
-    "font-src 'self'; "
-    "connect-src 'self'; "
-    "object-src 'none'; "
-    "base-uri 'self'; "
-    "form-action 'self'; "
-    "frame-ancestors 'none'; "
-    "upgrade-insecure-requests"
-)
-
-# HSTS max-age in seconds (default 2 years), override via HSTS_MAX_AGE env var
-_HSTS_MAX_AGE = safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0)
-
-
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response: Response = await call_next(request)
-        _apply_security_headers(response)
-        return response
-
+# ─── Middleware Stack ─────────────────────────────────────────────────
+# Registration order is reversed at runtime (last registered = outermost).
+# Execution order: CORS → MaxBody → RequestID → SecurityHeaders
 app.add_middleware(SecurityHeadersMiddleware)
-
-
-# ─── Global Exception Handler (CWE-209) ─────────────────────────────
-# FastAPI's default 500 response can leak stack traces, file paths, and
-# internal module names. Catch all unhandled exceptions and return a
-# generic error with a request ID for traceability.
-@app.exception_handler(Exception)
-async def _global_exception_handler(request: Request, exc: Exception):
-    request_id = request.state.request_id if hasattr(request.state, "request_id") else "unknown"
-    logger.error("Unhandled %s [request_id=%s]", type(exc).__name__, request_id)
-    response = JSONResponse(
-        status_code=500,
-        content={"detail": "Internal server error.", "request_id": request_id},
-    )
-    # Exception handler responses bypass BaseHTTPMiddleware, so we must
-    # apply security headers directly here to avoid header gaps on 500s.
-    _apply_security_headers(response)
-    return response
-
-
-# Declarative security headers — add/audit in one place, applied everywhere.
-_SECURITY_HEADERS = {
-    "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
-    "X-DNS-Prefetch-Control": "off",
-    "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
-    "X-Permitted-Cross-Domain-Policies": "none",
-    "Cache-Control": "no-store",
-}
-
-
-def _apply_security_headers(response: Response) -> None:
-    """Apply all security headers — shared by middleware and exception handler."""
-    for header, value in _SECURITY_HEADERS.items():
-        response.headers[header] = value
-    # Dynamic headers that depend on env config
-    response.headers["Content-Security-Policy"] = os.getenv("CSP_POLICY", _DEFAULT_CSP)
-    response.headers["Strict-Transport-Security"] = (
-        f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"
-    )
-
-
-# ─── Request ID Middleware ───────────────────────────────────────────
-# Assigns a unique ID to every request for security incident correlation.
-# Clients can pass X-Request-ID; if absent, one is generated.
-class RequestIDMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID", "")
-        # Validate client-provided IDs — reject oversized or control-char payloads
-        if not request_id or len(request_id) > 64 or _CONTROL_CHAR_RE.search(request_id):
-            request_id = uuid.uuid4().hex
-        request.state.request_id = request_id
-        response = await call_next(request)
-        response.headers["X-Request-ID"] = request_id
-        return response
-
 app.add_middleware(RequestIDMiddleware)
 app.add_middleware(MaxBodySizeMiddleware)
 
-# CORS — restrict to explicit origins in production
 allowed_origins = os.getenv("CORS_ORIGINS", "").split(",")
 allowed_origins = [o.strip() for o in allowed_origins if o.strip()]
 if allowed_origins:
@@ -246,6 +63,21 @@ if allowed_origins:
     )
 
 
+# ─── Global Exception Handler (CWE-209) ─────────────────────────────
+@app.exception_handler(Exception)
+async def _global_exception_handler(request: Request, exc: Exception):
+    request_id = request.state.request_id if hasattr(request.state, "request_id") else "unknown"
+    logger.error("Unhandled %s [request_id=%s]", type(exc).__name__, request_id)
+    response = JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error.", "request_id": request_id},
+    )
+    apply_security_headers(response)
+    return response
+
+
+# ─── Endpoints ───────────────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
     return {"status": "ok"}
@@ -253,49 +85,47 @@ async def health():
 
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(request: QueryRequest, req: Request):
-    # Authenticate — reject unauthorized callers before burning any compute
-    auth_error = _authenticate(req)
+    # Authenticate
+    auth_error = authenticate(req)
     if auth_error:
         raise HTTPException(status_code=401, detail=auth_error)
 
-    # Rate limit — protect OpenAI budget and prevent abuse
+    # Rate limit
     client_ip = resolve_client_ip(req)
-    if not _check_rate_limit(client_ip):
+    if not check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
 
     start_total = time.perf_counter()
     original_query = request.query
 
-    # 1. Classify (async - non-blocking)
+    # 1. Classify
     category = await classify_query_async(original_query)
-    # Strip all C0 control chars (U+0000–U+001F) to prevent log injection
     safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
     request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
     logger.info("Query: %s | Category: %s | request_id=%s", safe_query, category, request_id)
 
-    # 2. Rewrite if ambiguous (placeholder for future enhancement)
+    # 2. Rewrite if ambiguous
     final_query = original_query
     if category == "ambiguous":
-        # Could add query expansion or clarification here
         pass
 
-    # 3. Retrieve (sync - FAISS is CPU-bound, fast enough)
+    # 3. Retrieve
     start_retrieval = time.perf_counter()
     search_results = perform_search(final_query, k=request.k)
     retrieval_ms = (time.perf_counter() - start_retrieval) * 1000
 
-    # 4. Synthesize (async - non-blocking LLM call)
+    # 4. Synthesize
     start_synthesis = time.perf_counter()
     synthesis_result = await synthesize_answer_async(final_query, search_results)
     synthesis_ms = (time.perf_counter() - start_synthesis) * 1000
 
-    # 5. Format Response — sanitize all corpus-sourced fields (CWE-116)
-    citations = build_citations(search_results, synthesis_result, _sanitize_output)
+    # 5. Format Response
+    citations = build_citations(search_results, synthesis_result, sanitize_output)
 
     end_total = time.perf_counter()
     latency = (end_total - start_total) * 1000
 
-    # 6. Build diagnostics (opt-in)
+    # 6. Diagnostics (opt-in)
     diagnostics = None
     if request.include_diagnostics:
         diagnostics = build_diagnostics(
@@ -303,9 +133,9 @@ async def query_endpoint(request: QueryRequest, req: Request):
         )
 
     return QueryResponse(
-        query=_sanitize_output(original_query),
+        query=sanitize_output(original_query),
         category=category,
-        answer=_sanitize_output(synthesis_result["answer"]),
+        answer=sanitize_output(synthesis_result["answer"]),
         citations=citations,
         confidence=synthesis_result["confidence"],
         latency_ms=round(latency, 2),

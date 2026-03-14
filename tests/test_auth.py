@@ -34,15 +34,16 @@ def _mock_llm():
 
 def _make_client_with_keys(keys_csv: str):
     """Set API_KEYS and return a TestClient, restoring original keys on teardown."""
-    import src.api.main as mod
-    original_keys = mod._API_KEYS.copy()
-    mod._API_KEYS.clear()
+    import src.api.main as main_mod
+    import src.api.middleware as mw_mod
+    original_keys = mw_mod._API_KEYS.copy()
+    mw_mod._API_KEYS.clear()
     if keys_csv:
-        mod._API_KEYS.update(k.strip() for k in keys_csv.split(",") if k.strip())
-    client = TestClient(mod.app, raise_server_exceptions=False)
+        mw_mod._API_KEYS.update(k.strip() for k in keys_csv.split(",") if k.strip())
+    client = TestClient(main_mod.app, raise_server_exceptions=False)
     yield client
-    mod._API_KEYS.clear()
-    mod._API_KEYS.update(original_keys)
+    mw_mod._API_KEYS.clear()
+    mw_mod._API_KEYS.update(original_keys)
 
 
 @pytest.fixture()
@@ -119,9 +120,9 @@ class TestTimingSafety:
     """Verify constant-time comparison is used (structural check)."""
 
     def test_hmac_import_present(self):
-        import src.api.main as mod
+        import src.api.middleware as mod
         import inspect
-        source = inspect.getsource(mod._authenticate)
+        source = inspect.getsource(mod.authenticate)
         assert "compare_digest" in source
 
     def test_authenticate_rejects_partial_match(self, authed_client):

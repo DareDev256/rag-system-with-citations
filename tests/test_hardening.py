@@ -456,7 +456,7 @@ class TestRateLimiting:
         """Exceeding RATE_LIMIT_RPM should return 429 Too Many Requests."""
         mock_c.return_value = "factual"
         mock_s.return_value = {"answer": "ok", "citations_used": [], "confidence": 0.5}
-        from src.api.main import _rate_store, _RATE_LIMIT
+        from src.api.middleware import _rate_store, _RATE_LIMIT
         import time as t
         # Stuff the rate store to simulate exhausted quota
         _rate_store["testclient"] = [t.monotonic()] * (_RATE_LIMIT + 1)
@@ -467,7 +467,7 @@ class TestRateLimiting:
 
     def test_rate_limit_has_security_headers(self, client):
         """429 responses must still include security headers."""
-        from src.api.main import _rate_store, _RATE_LIMIT
+        from src.api.middleware import _rate_store, _RATE_LIMIT
         import time as t
         _rate_store["testclient"] = [t.monotonic()] * (_RATE_LIMIT + 1)
         resp = client.post("/query", json={"query": "blocked"})
@@ -534,10 +534,10 @@ class TestOutputSanitization:
 
     def test_sanitize_output_unit(self):
         """Direct unit test for _sanitize_output."""
-        from src.api.main import _sanitize_output
-        assert _sanitize_output("clean") == "clean"
-        assert _sanitize_output("a\x00b\x08c\x7fd") == "abcd"
-        assert _sanitize_output("keep\nnewlines\tand\rtabs") == "keep\nnewlines\tand\rtabs"
+        from src.api.middleware import sanitize_output
+        assert sanitize_output("clean") == "clean"
+        assert sanitize_output("a\x00b\x08c\x7fd") == "abcd"
+        assert sanitize_output("keep\nnewlines\tand\rtabs") == "keep\nnewlines\tand\rtabs"
 
 
 # ── LLM_TIMEOUT Safe Parsing ─────────────────────────────────────
@@ -575,7 +575,7 @@ class TestRateLimiterMemory:
 
     def test_evict_stale_ips_removes_empty_entries(self):
         """IPs with no recent requests should be evicted."""
-        from src.api.main import _evict_stale_ips, _rate_store
+        from src.api.middleware import _evict_stale_ips, _rate_store
         _rate_store.clear()
         now = 1000.0
         _rate_store["stale-ip"] = [now - 120]  # expired (>60s ago)
@@ -589,7 +589,7 @@ class TestRateLimiterMemory:
 
     def test_max_tracked_ips_triggers_eviction(self):
         """When IP count exceeds _MAX_TRACKED_IPS, stale entries are purged."""
-        from src.api.main import _check_rate_limit, _rate_store, _MAX_TRACKED_IPS
+        from src.api.middleware import check_rate_limit, _rate_store, _MAX_TRACKED_IPS
         import time as t
         _rate_store.clear()
         now = t.monotonic()
@@ -597,7 +597,7 @@ class TestRateLimiterMemory:
         for i in range(_MAX_TRACKED_IPS + 1):
             _rate_store[f"ip-{i}"] = [now - 120]
         # Next check should trigger eviction
-        _check_rate_limit("trigger-ip")
+        check_rate_limit("trigger-ip")
         assert len(_rate_store) < _MAX_TRACKED_IPS
         _rate_store.clear()
 

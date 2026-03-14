@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.0] - 2026-03-14
+
+### Changed
+- **Extracted middleware module** (`src/api/middleware.py`) — rate limiting, authentication, security headers, body size validation, request ID tracking, and output sanitization extracted from the 317-line `main.py` monolith into a dedicated middleware module; `main.py` is now a clean 130-line orchestrator focused on app setup and endpoint logic
+- **Public API for middleware functions** — `_check_rate_limit` → `check_rate_limit`, `_authenticate` → `authenticate`, `_sanitize_output` → `sanitize_output`, `_apply_security_headers` → `apply_security_headers` for cleaner cross-module imports
+- Updated 8 test files to import middleware symbols from `src.api.middleware` instead of `src.api.main`
+
 ## [1.13.1] - 2026-03-14
 
 ### Added

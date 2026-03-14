@@ -86,7 +86,7 @@ class TestMaxBodySizeMiddleware:
 
     def test_exact_limit_passes(self, client):
         """Body exactly at the limit should pass, not be rejected."""
-        from src.api.main import _MAX_BODY_BYTES
+        from src.api.middleware import _MAX_BODY_BYTES
         # Content-Length == limit should pass
         resp = client.post(
             "/query",
@@ -101,7 +101,7 @@ class TestMaxBodySizeMiddleware:
 
     def test_one_over_limit_rejected(self, client):
         """Body at limit + 1 byte should be rejected."""
-        from src.api.main import _MAX_BODY_BYTES
+        from src.api.middleware import _MAX_BODY_BYTES
         resp = client.post(
             "/query",
             content=b'{"query": "x"}',
@@ -169,7 +169,7 @@ class TestGlobalExceptionHandler:
 
     @patch("src.api.main.perform_search", side_effect=RuntimeError("DB connection lost"))
     @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
-    @patch("src.api.main._check_rate_limit", return_value=True)
+    @patch("src.api.main.check_rate_limit", return_value=True)
     def test_500_hides_exception_details(self, _rl, _classify, _search, client):
         """Internal errors must NOT leak exception message or traceback."""
         resp = client.post("/query", json={"query": "test question"})
@@ -180,7 +180,7 @@ class TestGlobalExceptionHandler:
 
     @patch("src.api.main.perform_search", side_effect=RuntimeError("secret path info"))
     @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
-    @patch("src.api.main._check_rate_limit", return_value=True)
+    @patch("src.api.main.check_rate_limit", return_value=True)
     def test_500_includes_request_id(self, _rl, _classify, _search, client):
         """500 response includes request_id for incident correlation."""
         resp = client.post("/query", json={"query": "test"})
@@ -191,7 +191,7 @@ class TestGlobalExceptionHandler:
 
     @patch("src.api.main.perform_search", side_effect=ValueError("bad dimension"))
     @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
-    @patch("src.api.main._check_rate_limit", return_value=True)
+    @patch("src.api.main.check_rate_limit", return_value=True)
     def test_500_has_security_headers(self, _rl, _classify, _search, client):
         """Security headers must be present even on 500 error responses."""
         resp = client.post("/query", json={"query": "test"})
@@ -202,7 +202,7 @@ class TestGlobalExceptionHandler:
 
     @patch("src.api.main.perform_search", side_effect=Exception("traceback\n  File \"/app/src/secret.py\""))
     @patch("src.api.main.classify_query_async", new_callable=AsyncMock, return_value="factual")
-    @patch("src.api.main._check_rate_limit", return_value=True)
+    @patch("src.api.main.check_rate_limit", return_value=True)
     def test_500_no_stack_trace_leak(self, _rl, _classify, _search, client):
         """Response body must not contain file paths or traceback fragments."""
         resp = client.post("/query", json={"query": "test"})
