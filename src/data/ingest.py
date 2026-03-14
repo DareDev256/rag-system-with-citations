@@ -1,8 +1,11 @@
-import os
 import glob
+import logging
+import os
 from typing import List, Dict
 from src.retrieval.embed import get_embedder
 from src.retrieval.vector_store import VectorStore
+
+logger = logging.getLogger(__name__)
 
 CORPUS_DIR = "src/data/corpus"
 INDEX_DIR = "data_store"
@@ -10,7 +13,7 @@ INDEX_DIR = "data_store"
 def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
     docs = []
     if not os.path.exists(corpus_dir):
-        print(f"Corpus directory {corpus_dir} does not exist.")
+        logger.warning("Corpus directory %s does not exist.", corpus_dir)
         return docs
 
     # Path traversal guard — resolve symlinks and verify canonical path
@@ -18,14 +21,14 @@ def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
     for filepath in glob.glob(os.path.join(corpus_dir, "*.txt")):
         real_file = os.path.realpath(filepath)
         if not real_file.startswith(real_corpus + os.sep) and real_file != real_corpus:
-            print(f"Warning: skipping {filepath}: path traversal detected")
+            logger.warning("Skipping %s: path traversal detected", filepath)
             continue
         filename = os.path.basename(real_file)
         try:
             with open(filepath, "r", encoding="utf-8") as f:
                 text = f.read()
         except (OSError, UnicodeDecodeError) as e:
-            print(f"Warning: skipping {filename}: {e}")
+            logger.warning("Skipping %s: %s", filename, e)
             continue
         # Simple chunking by paragraph or fixed size could go here.
         # For this demo, treating each file or paragraph as a doc.
@@ -43,22 +46,22 @@ def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
     return docs
 
 def ingest():
-    print("Starting ingestion...")
+    logger.info("Starting ingestion...")
     
     # Ensure index dir exists
     os.makedirs(INDEX_DIR, exist_ok=True)
         
     docs = load_documents(CORPUS_DIR)
-    print(f"Loaded {len(docs)} documents/chunks.")
+    logger.info("Loaded %d documents/chunks.", len(docs))
     
     if not docs:
-        print("No documents found to ingest.")
+        logger.warning("No documents found to ingest.")
         return
 
     embedder = get_embedder()
     texts = [d["text"] for d in docs]
     
-    print("Embedding documents...")
+    logger.info("Embedding documents...")
     embeddings = embedder.encode(texts)
     
     vector_store = VectorStore(
@@ -71,7 +74,7 @@ def ingest():
     vector_store.add_documents(embeddings, docs)
     vector_store.save_index()
     
-    print("Ingestion complete.")
+    logger.info("Ingestion complete.")
 
 if __name__ == "__main__":
     ingest()

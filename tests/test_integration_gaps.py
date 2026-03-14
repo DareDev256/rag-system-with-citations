@@ -162,12 +162,12 @@ class TestGetLlmClient:
 
     @patch("src.llm.synthesize.openai.OpenAI")
     @patch("src.llm.synthesize.os.getenv", return_value=None)
-    def test_warns_on_missing_key(self, mock_env, mock_openai, capsys):
+    def test_warns_on_missing_key(self, mock_env, mock_openai, caplog):
         from src.llm.synthesize import get_llm_client
 
-        get_llm_client()
-        captured = capsys.readouterr()
-        assert "OPENAI_API_KEY not found" in captured.out
+        with caplog.at_level("WARNING", logger="rag_api"):
+            get_llm_client()
+        assert "OPENAI_API_KEY not found" in caplog.text
 
 
 class TestGetAsyncLlmClient:
@@ -201,12 +201,12 @@ class TestGetAsyncLlmClient:
     @pytest.mark.asyncio
     @patch("src.llm.synthesize.openai.AsyncOpenAI")
     @patch("src.llm.synthesize.os.getenv", return_value="")
-    async def test_warns_on_empty_key(self, mock_env, mock_async, capsys):
+    async def test_warns_on_empty_key(self, mock_env, mock_async, caplog):
         from src.llm.synthesize import get_async_llm_client
 
-        await get_async_llm_client()
-        captured = capsys.readouterr()
-        assert "OPENAI_API_KEY not found" in captured.out
+        with caplog.at_level("WARNING", logger="rag_api"):
+            await get_async_llm_client()
+        assert "OPENAI_API_KEY not found" in caplog.text
 
 
 # ---------------------------------------------------------------------------

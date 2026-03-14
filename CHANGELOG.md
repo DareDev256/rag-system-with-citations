@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.13.0] - 2026-03-14
+
+### Changed
+- **Unified logging across all modules** — replaced 14 `print()` calls with structured `logging` in `synthesize.py`, `vector_store.py`, `ingest.py`, and `evaluate.py`; all output now routes through the logging framework for level filtering, consistent formatting, and log aggregation compatibility
+- **Citation regex extracted to module constant** — `CITATION_PATTERN` is now a pre-compiled `re.compile()` constant in `synthesize.py` instead of a raw string re-created on every call; importable for downstream use
+- **Lambda-to-function conversion** — `_CLASSIFICATION_MESSAGES` and `_SYNTHESIS_MESSAGES` lambdas replaced with proper named functions (`_classification_messages`, `_synthesis_messages`) for meaningful tracebacks and PEP 8 E731 compliance
+- **Type hint completeness** — added `Optional[Set[str]]` on `extract_cited_doc_ids`, return types on `_call_llm`/`_call_llm_async`/`_parse_classification`/`_parse_synthesis`, and `Any` type annotations on LLM response parameters
+- **Version sync** — `main.py` version now matches CHANGELOG (was stuck at 1.12.0)
+- Updated 3 tests to match refactored code: `capsys` → `caplog` for log assertions (print→logging migration)
+
 ## [1.12.2] - 2026-03-13
 
 ### Changed

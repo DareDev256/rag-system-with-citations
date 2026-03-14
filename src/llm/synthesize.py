@@ -4,7 +4,7 @@ import os
 import re
 import threading
 import openai
-from typing import List, Dict, Any, Set
+from typing import List, Dict, Any, Optional, Set
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
 from src.utils.env import safe_int_env
 from src.utils.timing import measure_latency
@@ -37,7 +37,7 @@ def _client_kwargs() -> dict:
     kwargs = {}
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        print("Warning: OPENAI_API_KEY not found in env.")
+        logger.warning("OPENAI_API_KEY not found in env.")
     kwargs["api_key"] = api_key
 
     base_url = os.getenv("OPENAI_BASE_URL")
@@ -73,14 +73,16 @@ async def get_async_llm_client():
     return _async_llm_client
 
 
-def extract_cited_doc_ids(answer: str, available_ids: Set[str] = None) -> Set[str]:
+CITATION_PATTERN = re.compile(r'\[([^\]]+)\]')
+
+
+def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None) -> Set[str]:
     """Extract all [doc_id] citations from the answer text.
 
     If available_ids is provided, only returns IDs that match actual
     documents from search results, filtering out hallucinated citations.
     """
-    pattern = r'\[([^\]]+)\]'
-    matches = re.findall(pattern, answer)
+    matches = CITATION_PATTERN.findall(answer)
     cited = set(matches)
     if available_ids is not None:
         cited = cited & available_ids
@@ -134,24 +136,27 @@ def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set
 
 _VALID_CATEGORIES = {"factual", "exploratory", "ambiguous"}
 
-_CLASSIFICATION_MESSAGES = lambda query: [
-    {"role": "system", "content": "You are a precise classifier."},
-    {"role": "user", "content": format_classification_prompt(query)},
-]
-
-_SYNTHESIS_MESSAGES = lambda prompt: [
-    {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
-    {"role": "user", "content": prompt},
-]
+def _classification_messages(query: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": "You are a precise classifier."},
+        {"role": "user", "content": format_classification_prompt(query)},
+    ]
 
 
-def _parse_classification(response) -> str:
+def _synthesis_messages(prompt: str) -> List[Dict[str, str]]:
+    return [
+        {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
+        {"role": "user", "content": prompt},
+    ]
+
+
+def _parse_classification(response: Any) -> str:
     """Parse LLM classification response into a valid category."""
     category = response.choices[0].message.content.strip().lower()
     return category if category in _VALID_CATEGORIES else "exploratory"
 
 
-def _parse_synthesis(response, search_results: List[Dict]) -> Dict[str, Any]:
+def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any]:
     """Parse LLM synthesis response into answer dict with citations and confidence."""
     answer = response.choices[0].message.content.strip()
 
@@ -178,12 +183,12 @@ _SYNTHESIS_ERROR = {"answer": "Error generating answer.", "citations_used": [], 
 
 # ─── LLM call helpers (sync/async DRY) ───────────────────────────────
 
-def _call_llm(client, model: str, messages: list, **kwargs):
+def _call_llm(client: Any, model: str, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
     """Sync LLM call — single entry point for all blocking OpenAI requests."""
     return client.chat.completions.create(model=model, messages=messages, **kwargs)
 
 
-async def _call_llm_async(client, model: str, messages: list, **kwargs):
+async def _call_llm_async(client: Any, model: str, messages: List[Dict[str, str]], **kwargs: Any) -> Any:
     """Async LLM call — single entry point for all non-blocking OpenAI requests."""
     return await client.chat.completions.create(model=model, messages=messages, **kwargs)
 
@@ -194,7 +199,7 @@ async def _call_llm_async(client, model: str, messages: list, **kwargs):
 def classify_query(query: str) -> str:
     client = get_llm_client()
     try:
-        response = _call_llm(client, CLASSIFICATION_MODEL, _CLASSIFICATION_MESSAGES(query), temperature=0, max_tokens=10)
+        response = _call_llm(client, CLASSIFICATION_MODEL, _classification_messages(query), temperature=0, max_tokens=10)
         return _parse_classification(response)
     except Exception as e:
         logger.error("Classification failed: %s", type(e).__name__)
@@ -206,7 +211,7 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     client = get_llm_client()
     prompt = format_rag_prompt(build_context_str(search_results), query)
     try:
-        response = _call_llm(client, SYNTHESIS_MODEL, _SYNTHESIS_MESSAGES(prompt), temperature=0.0, max_tokens=500)
+        response = _call_llm(client, SYNTHESIS_MODEL, _synthesis_messages(prompt), temperature=0.0, max_tokens=500)
         return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Synthesis failed: %s", type(e).__name__)
@@ -219,7 +224,7 @@ async def classify_query_async(query: str) -> str:
     """Async version of classify_query for non-blocking API calls."""
     client = await get_async_llm_client()
     try:
-        response = await _call_llm_async(client, CLASSIFICATION_MODEL, _CLASSIFICATION_MESSAGES(query), temperature=0, max_tokens=10)
+        response = await _call_llm_async(client, CLASSIFICATION_MODEL, _classification_messages(query), temperature=0, max_tokens=10)
         return _parse_classification(response)
     except Exception as e:
         logger.error("Async classification failed: %s", type(e).__name__)
@@ -231,7 +236,7 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
     client = await get_async_llm_client()
     prompt = format_rag_prompt(build_context_str(search_results), query)
     try:
-        response = await _call_llm_async(client, SYNTHESIS_MODEL, _SYNTHESIS_MESSAGES(prompt), temperature=0.0, max_tokens=500)
+        response = await _call_llm_async(client, SYNTHESIS_MODEL, _synthesis_messages(prompt), temperature=0.0, max_tokens=500)
         return _parse_synthesis(response, search_results)
     except Exception as e:
         logger.error("Async synthesis failed: %s", type(e).__name__)

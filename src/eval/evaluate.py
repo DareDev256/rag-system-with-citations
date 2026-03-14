@@ -1,10 +1,12 @@
+import logging
 import os
-import json
 import time
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer
 from src.eval.metrics import calculate_citation_coverage
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 EVAL_DATA = [
     {"query": "What is RAG?", "expected_keywords": ["retrieval", "generation", "LLM"]},
@@ -13,7 +15,7 @@ EVAL_DATA = [
 ]
 
 def run_evaluation():
-    print("Starting evaluation...")
+    logger.info("Starting evaluation...")
     results = []
     
     for item in EVAL_DATA:
@@ -47,9 +49,8 @@ def run_evaluation():
     os.makedirs("reports", exist_ok=True)
     df.to_csv("reports/eval_results.csv", index=False)
     
-    print("\nEvaluation Results:")
-    print(df.to_markdown())
-    print(f"\nSaved to reports/eval_results.csv")
+    logger.info("Evaluation Results:\n%s", df.to_markdown())
+    logger.info("Saved to reports/eval_results.csv")
 
 if __name__ == "__main__":
     run_evaluation()

@@ -1,8 +1,12 @@
 import faiss
-import numpy as np
 import json
+import logging
 import os
+
+import numpy as np
 from typing import List, Dict, Any
+
+logger = logging.getLogger(__name__)
 
 class VectorStore:
     def __init__(self, index_path="faiss_index.bin", metadata_path="metadata.json"):
@@ -13,12 +17,12 @@ class VectorStore:
 
     def load_index(self):
         if os.path.exists(self.index_path) and os.path.exists(self.metadata_path):
-            print(f"Loading index from {self.index_path}")
+            logger.info("Loading index from %s", self.index_path)
             self.index = faiss.read_index(self.index_path)
             with open(self.metadata_path, "r", encoding="utf-8") as f:
                 self.metadata = json.load(f)
         else:
-            print("No existing index found. Starting fresh.")
+            logger.info("No existing index found. Starting fresh.")
             self.index = None
             self.metadata = []
 
@@ -56,7 +60,7 @@ class VectorStore:
             faiss.write_index(self.index, self.index_path)
             with open(self.metadata_path, "w", encoding="utf-8") as f:
                 json.dump(self.metadata, f, ensure_ascii=False)
-            print("Index saved.")
+            logger.info("Index saved.")
 
     def search(self, query_vector: List[float], k: int = 3):
         if not self.index:

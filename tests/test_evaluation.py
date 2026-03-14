@@ -129,7 +129,7 @@ class TestRunEvaluation:
     @patch("src.eval.evaluate.synthesize_answer")
     @patch("src.eval.evaluate.perform_search")
     def test_prints_markdown_table(
-        self, mock_search, mock_synth, mock_coverage, mock_df_cls, mock_makedirs, capsys
+        self, mock_search, mock_synth, mock_coverage, mock_df_cls, mock_makedirs, caplog
     ):
         from src.eval.evaluate import run_evaluation
 
@@ -139,12 +139,12 @@ class TestRunEvaluation:
         mock_df.to_markdown.return_value = "| query | latency_ms |"
         mock_df_cls.return_value = mock_df
 
-        run_evaluation()
+        with caplog.at_level("INFO"):
+            run_evaluation()
 
-        output = capsys.readouterr().out
-        assert "Evaluation Results:" in output
-        assert "| query | latency_ms |" in output
-        assert "reports/eval_results.csv" in output
+        assert "Evaluation Results:" in caplog.text
+        assert "| query | latency_ms |" in caplog.text
+        assert "reports/eval_results.csv" in caplog.text
 
     @patch("src.eval.evaluate.os.makedirs")
     @patch("src.eval.evaluate.pd.DataFrame")
