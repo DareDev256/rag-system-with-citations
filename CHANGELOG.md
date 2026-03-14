@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.13.1] - 2026-03-14
+
+### Added
+- **35 contract tests** (`test_contracts.py`) — behavioral interface tests verifying promises between components: prompt double-replacement safety, client factory conditional kwargs, `safe_int_env` bounds checking (float strings, empty strings, min_val boundary), synthesis fallback when LLM omits citations, hallucinated citation filtering, `measure_latency` injection/passthrough, `CITATION_PATTERN` edge cases (nested brackets, empty brackets), hallucination estimator adversarial inputs
+- Total test count: 378 → 413
+
 ## [1.13.0] - 2026-03-14
 
 ### Changed
