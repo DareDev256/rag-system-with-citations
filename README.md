@@ -176,6 +176,10 @@ Real metric, not model self-assessment:
 
 Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
+### Deep Dives
+
+- **[LLM Synthesis Design](docs/llm-synthesis.md)** — confidence scoring algorithm, citation extraction, sync/async parity, error fallback strategy, client singleton management
+
 ## Testing
 
 378 tests across 15 suites. All mocked — runs without API keys, FAISS indexes, or network access.
@@ -271,7 +275,7 @@ src/
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls (sync + async), confidence scoring
+│   └── synthesize.py    # LLM calls (sync + async), confidence scoring — [design doc](docs/llm-synthesis.md)
 ├── retrieval/
 │   ├── embed.py         # Sentence Transformers embedder (singleton)
 │   ├── search.py        # Search orchestration layer
