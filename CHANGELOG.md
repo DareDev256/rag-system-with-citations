@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.1] - 2026-03-16
+
+### Added
+- **SocialBu MCP integration research doc** (`docs/socialbu-mcp-integration.md`) — documents how any MCP-compatible AI agent (Claude, Cursor, custom agents) can connect to SocialBu's social media management API via OpenAPI-to-MCP proxy servers; covers authentication flow, setup for Python (`mcp-openapi-proxy`) and Node (`openapi-mcp-server`) proxies, all exposed tool categories (posts, queues, media, insights, AI tools), and RAG system integration patterns
+
 ## [1.14.0] - 2026-03-14
 
 ### Changed

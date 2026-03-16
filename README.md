@@ -179,6 +179,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 ### Deep Dives
 
 - **[LLM Synthesis Design](docs/llm-synthesis.md)** — confidence scoring algorithm, citation extraction, sync/async parity, error fallback strategy, client singleton management
+- **[SocialBu MCP Integration](docs/socialbu-mcp-integration.md)** — connect AI agents to SocialBu for automated social media posting via MCP + OpenAPI proxy
 
 ## Testing
 
