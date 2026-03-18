@@ -3,8 +3,8 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-413_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-14-e05d44?style=flat-square&logo=shield)
+![Tests](https://img.shields.io/badge/tests-423_passing-2ea44f?style=flat-square)
+![Security](https://img.shields.io/badge/defense_layers-17-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 14-layer defense-in-depth security.
 
@@ -23,7 +23,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **Hallucination detection** — flags citations that reference documents not in the retrieval set
 - **14-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
-- **378 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **423 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -183,8 +183,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-378 tests across 15 suites. All mocked — runs without API keys, FAISS indexes, or network access.
-399 tests across 16 test suites — pure function tests, mock-based LLM tests, async tests, API endpoint tests, edge cases, hardening, middleware, auth, input validation, response builders, resilience, and integration tests:
+423 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -206,6 +205,7 @@ pytest tests/ -v
 | `test_llm_async.py` | 14 | Async LLM mocks — parity with sync implementations |
 | `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
 | `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
+| `test_security_audit.py` | 10 | Chunked TE bypass, GET auth narrowing, env var upper bounds |
 | `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
 | Suite | Tests | Coverage |
 |-------|-------|----------|
