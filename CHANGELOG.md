@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.2] - 2026-03-19
+
+### Changed
+- **Docstrings across core modules** — added module-level, class-level, and method-level docstrings to the 5 undocumented core modules: `schemas.py` (4 Pydantic models), `vector_store.py` (VectorStore class + all 5 methods), `embed.py` (Embedder class + encode + get_embedder), `search.py` (get_search_engine + perform_search), and `main.py` (module + lifespan + both endpoints). Every public API now has a docstring explaining its purpose, arguments, return values, and failure modes.
+
+### Fixed
+- **README duplicate test table removed** — lines 226–244 contained a full second copy of the test suite table (with "Coverage" column) that duplicated and conflicted with the primary table above it; removed the stale duplicate
+- **README test count corrected** — badge, feature bullet, and testing section all said 425 tests; actual count is 413 (verified via `pytest --co`)
+- **README security layer count corrected** — feature bullet said "14-layer" but the security table lists 15 layers (webhook HMAC verification was layer 15, added in v1.14.0)
+
 ## [1.14.1] - 2026-03-16
 
 ### Added

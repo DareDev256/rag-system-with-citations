@@ -1,3 +1,11 @@
+"""FastAPI application — endpoint orchestration for the RAG pipeline.
+
+This module is the thin entry point: it wires up middleware, defines
+the /query and /health endpoints, and delegates all heavy lifting to
+the retrieval, LLM, and response-builder modules. Security enforcement
+(rate limiting, auth, headers, body size) lives in middleware.py.
+"""
+
 import logging
 import os
 import re
@@ -30,6 +38,7 @@ logger = logging.getLogger("rag_api")
 
 @asynccontextmanager
 async def lifespan(app):
+    """Validate required env vars at startup; fail fast if missing."""
     if not os.getenv("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY environment variable is not set")
     yield
@@ -38,7 +47,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.14.1",
+    version="1.14.2",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -80,11 +89,13 @@ async def _global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health")
 async def health():
+    """Liveness probe — returns 200 with {"status": "ok"}."""
     return {"status": "ok"}
 
 
 @app.post("/query", response_model=QueryResponse)
 async def query_endpoint(request: QueryRequest, req: Request):
+    """RAG query pipeline: authenticate → rate-limit → classify → retrieve → synthesize → respond."""
     # Authenticate
     auth_error = authenticate(req)
     if auth_error:

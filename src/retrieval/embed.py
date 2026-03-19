@@ -1,3 +1,11 @@
+"""Sentence embedding singleton with model name validation (CWE-73).
+
+Wraps SentenceTransformer in a singleton Embedder that loads once and
+reuses across requests. The EMBEDDING_MODEL env var is validated at import
+time to reject filesystem paths, URLs, and shell metacharacters before
+the model loader ever sees them.
+"""
+
 from sentence_transformers import SentenceTransformer
 from typing import List
 import logging
@@ -34,6 +42,14 @@ EMBEDDING_MODEL = _validate_model_name(
 
 
 class Embedder:
+    """Thread-safe singleton wrapper around SentenceTransformer.
+
+    Uses __new__ to guarantee a single model instance across all threads.
+    If the initial model load fails (OOM, network error, missing model),
+    the singleton stays unset so subsequent calls retry cleanly instead
+    of returning a half-initialized instance.
+    """
+
     _instance = None
 
     def __new__(cls):
@@ -50,10 +66,18 @@ class Embedder:
         return cls._instance
 
     def encode(self, texts: List[str]) -> List[List[float]]:
+        """Encode a list of texts into dense vector embeddings.
+
+        Args:
+            texts: Strings to embed (queries or document chunks).
+
+        Returns:
+            List of float vectors, one per input text.
+        """
         embeddings = self.model.encode(texts, convert_to_numpy=True)
         return embeddings.tolist()
 
 
-# Global accessor
-def get_embedder():
+def get_embedder() -> "Embedder":
+    """Return the global Embedder singleton (creates on first call)."""
     return Embedder()
