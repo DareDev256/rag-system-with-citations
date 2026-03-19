@@ -3,10 +3,10 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-423_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-17-e05d44?style=flat-square&logo=shield)
+![Tests](https://img.shields.io/badge/tests-425_passing-2ea44f?style=flat-square)
+![Security](https://img.shields.io/badge/defense_layers-18-e05d44?style=flat-square&logo=shield)
 
-A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 14-layer defense-in-depth security.
+A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 15-layer defense-in-depth security.
 
 **Every answer must cite its sources. If it can't, the confidence score reflects that.**
 
@@ -23,7 +23,8 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **Hallucination detection** — flags citations that reference documents not in the retrieval set
 - **14-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
-- **423 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
+- **425 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -136,6 +137,20 @@ curl -s -X POST http://localhost:8000/query \
 }
 ```
 
+### `POST /webhook/reindex`
+
+Trigger document re-indexing via signed webhook (e.g., from a CMS or CI pipeline):
+
+```bash
+# Generate signature and send
+SECRET="your-webhook-secret"
+PAYLOAD='{"event": "document_updated"}'
+SIG="sha256=$(echo -n "$PAYLOAD" | openssl dgst -sha256 -hmac "$SECRET" | cut -d' ' -f2)"
+curl -X POST http://localhost:8000/webhook/reindex \
+  -H "X-Hub-Signature-256: $SIG" \
+  -d "$PAYLOAD"
+```
+
 ### `GET /health`
 
 ```bash
@@ -155,7 +170,7 @@ Real metric, not model self-assessment:
 
 ## Security
 
-14-layer defense-in-depth. Each layer maps to a specific CWE threat class:
+15-layer defense-in-depth. Each layer maps to a specific CWE threat class:
 
 | Layer | Defense | CWE |
 |-------|---------|-----|
@@ -173,6 +188,7 @@ Real metric, not model self-assessment:
 | 12 | Log injection prevention | CWE-117 |
 | 13 | Embedding model name validation | CWE-94 |
 | 14 | Non-root Docker container | CWE-250 |
+| 15 | Webhook HMAC-SHA256 signature verification | CWE-345 |
 
 Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
@@ -183,7 +199,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-423 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+425 tests across 18 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -241,6 +257,7 @@ All settings via environment variables or `.env`:
 | `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Query classification model |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers embedding model |
 | `LLM_TIMEOUT` | `30` | OpenAI request timeout (seconds) |
+| `WEBHOOK_SECRET` | — | HMAC-SHA256 secret for `/webhook/reindex` (disabled when unset) |
 | `RATE_LIMIT_RPM` | `30` | Max requests/min per IP |
 | `MAX_BODY_BYTES` | `65536` | Request body size limit (413 on exceed) |
 | `TRUSTED_PROXY_COUNT` | `0` | Reverse proxies for X-Forwarded-For extraction |
@@ -292,7 +309,7 @@ src/
     ├── ip.py            # Trusted proxy IP resolution
     └── timing.py        # Latency measurement decorator
 ```
-17-layer defense-in-depth covering API key authentication, rate limiting, input validation (null byte rejection, control char blocking, parameter pollution prevention, Content-Type enforcement), output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+18-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation (null byte rejection, control char blocking, parameter pollution prevention, Content-Type enforcement), output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 
