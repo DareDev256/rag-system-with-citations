@@ -39,7 +39,12 @@ _MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024)
 
 
 class MaxBodySizeMiddleware(BaseHTTPMiddleware):
-    """Reject requests with bodies exceeding _MAX_BODY_BYTES before parsing."""
+    """Reject requests with bodies exceeding _MAX_BODY_BYTES.
+
+    Checks Content-Length header first (fast path), then enforces a hard
+    limit on the actual body stream to catch chunked transfer encoding
+    that omits Content-Length entirely (CWE-400 bypass).
+    """
 
     async def dispatch(self, request: Request, call_next):
         if request.method in ("POST", "PUT", "PATCH"):
@@ -55,6 +60,14 @@ class MaxBodySizeMiddleware(BaseHTTPMiddleware):
                     return JSONResponse(
                         status_code=400,
                         content={"detail": "Invalid Content-Length header."},
+                    )
+            else:
+                # No Content-Length → chunked encoding. Read and enforce limit.
+                body = await request.body()
+                if len(body) > _MAX_BODY_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": "Request body too large."},
                     )
         return await call_next(request)
 

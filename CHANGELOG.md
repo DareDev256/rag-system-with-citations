@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.3] - 2026-03-21
+
+### Security
+- **Chunked transfer encoding bypass (CWE-400)** — `MaxBodySizeMiddleware` only checked the `Content-Length` header; attackers could use `Transfer-Encoding: chunked` to stream arbitrarily large payloads past the size limit, exhausting server memory. Now reads and enforces the byte limit on the actual body stream when `Content-Length` is absent.
+- **Pinned high-risk dependencies** — `fastapi==0.129.0`, `uvicorn==0.41.0`, `openai==2.21.0` pinned to exact versions to prevent supply chain attacks via malicious updates to HTTP-parsing and API-key-handling libraries. Compute-only libraries (`numpy`, `faiss-cpu`) retain `>=` specifiers.
+- **`.gitignore` expanded for secret variants** — added `.env.*` glob to prevent accidental commits of `.env.local`, `.env.production`, `.env.staging`, etc. Exempts `.env.example` for safe documentation.
+
+### Fixed
+- **Lazy `%`-format logging in `timing.py`** — replaced f-string with `logger.debug("...", args)` to avoid unnecessary string formatting when debug logging is disabled
+
 ## [1.14.2] - 2026-03-19
 
 ### Changed

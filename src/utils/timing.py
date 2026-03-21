@@ -17,6 +17,6 @@ def measure_latency(func):
         elif hasattr(result, 'latency_ms'): # For objects
              result.latency_ms = round(latency_ms, 2)
         
-        logger.debug(f"Function {func.__name__} took {latency_ms:.2f}ms")
+        logger.debug("Function %s took %.2fms", func.__name__, latency_ms)
         return result
     return wrapper

@@ -177,7 +177,7 @@ Real metric, not model self-assessment:
 | 1 | Rate limiting (per-IP sliding window) | CWE-770 |
 | 2 | Trusted proxy IP resolution | CWE-348 |
 | 3 | API key auth (constant-time comparison) | CWE-862 |
-| 4 | Request body size cap (413 before parse) | CWE-400 |
+| 4 | Request body size cap (Content-Length + chunked) | CWE-400 |
 | 5 | Input validation (Pydantic field constraints) | CWE-20 |
 | 6 | Request ID tracing | CWE-778 |
 | 7 | LLM timeout enforcement | CWE-400 |
