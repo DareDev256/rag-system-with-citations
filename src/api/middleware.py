@@ -38,38 +38,76 @@ def sanitize_output(text: str) -> str:
 _MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024)
 
 
-class MaxBodySizeMiddleware(BaseHTTPMiddleware):
-    """Reject requests with bodies exceeding _MAX_BODY_BYTES.
+class _BodyTooLargeError(Exception):
+    """Sentinel raised when streamed body exceeds _MAX_BODY_BYTES."""
 
-    Checks Content-Length header first (fast path), then enforces a hard
-    limit on the actual body stream to catch chunked transfer encoding
-    that omits Content-Length entirely (CWE-400 bypass).
+
+class MaxBodySizeMiddleware:
+    """ASGI middleware that enforces body size limits.
+
+    Checks Content-Length header first (fast path), then wraps the ASGI
+    receive callable to count bytes incrementally for chunked transfers,
+    aborting before the full payload is buffered into memory (CWE-400).
+
+    Pure ASGI (not BaseHTTPMiddleware) so we can intercept ``receive``
+    before the body is fully consumed.
     """
 
-    async def dispatch(self, request: Request, call_next):
-        if request.method in ("POST", "PUT", "PATCH"):
-            content_length = request.headers.get("content-length")
-            if content_length:
-                try:
-                    if int(content_length) > _MAX_BODY_BYTES:
-                        return JSONResponse(
-                            status_code=413,
-                            content={"detail": "Request body too large."},
-                        )
-                except ValueError:
-                    return JSONResponse(
-                        status_code=400,
-                        content={"detail": "Invalid Content-Length header."},
-                    )
-            else:
-                # No Content-Length → chunked encoding. Read and enforce limit.
-                body = await request.body()
-                if len(body) > _MAX_BODY_BYTES:
-                    return JSONResponse(
-                        status_code=413,
-                        content={"detail": "Request body too large."},
-                    )
-        return await call_next(request)
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or scope.get("method", "GET") not in (
+            "POST", "PUT", "PATCH",
+        ):
+            await self.app(scope, receive, send)
+            return
+
+        # Fast path: trust Content-Length when present
+        headers = dict(scope.get("headers", []))
+        cl_raw = headers.get(b"content-length")
+        if cl_raw is not None:
+            try:
+                if int(cl_raw) > _MAX_BODY_BYTES:
+                    await self._send_json(send, 413, "Request body too large.")
+                    return
+            except (ValueError, UnicodeDecodeError):
+                await self._send_json(send, 400, "Invalid Content-Length header.")
+                return
+            await self.app(scope, receive, send)
+            return
+
+        # No Content-Length (chunked) — count bytes incrementally
+        bytes_received = 0
+
+        async def limited_receive():
+            nonlocal bytes_received
+            message = await receive()
+            if message.get("type") == "http.request":
+                bytes_received += len(message.get("body", b""))
+                if bytes_received > _MAX_BODY_BYTES:
+                    raise _BodyTooLargeError()
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except _BodyTooLargeError:
+            await self._send_json(send, 413, "Request body too large.")
+
+    @staticmethod
+    async def _send_json(send, status: int, detail: str):
+        """Send a JSON error response via raw ASGI send."""
+        import json as _json
+        body = _json.dumps({"detail": detail}).encode()
+        await send({
+            "type": "http.response.start",
+            "status": status,
+            "headers": [
+                [b"content-type", b"application/json"],
+                [b"content-length", str(len(body)).encode()],
+            ],
+        })
+        await send({"type": "http.response.body", "body": body})
 
 
 # ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────

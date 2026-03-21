@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.4] - 2026-03-21
+
+### Fixed
+- **Chunked encoding memory exhaustion (CWE-400)** — `MaxBodySizeMiddleware` called `await request.body()` for chunked requests, buffering the entire payload into memory before checking the size limit; a 10GB chunked stream would OOM the server before the 413 was ever sent. Converted to a pure ASGI middleware that wraps `receive` to count bytes incrementally, aborting after `_MAX_BODY_BYTES` with at most 2 chunks read regardless of payload size.
+
+### Added
+- 8 new chunked encoding tests (`test_chunked_bypass.py`) — small/oversized/exact-limit chunked bodies, early abort verification (proves ≤2 chunks read for arbitrarily large payloads), multi-chunk accumulation, GET bypass, WebSocket passthrough — 421 tests total
+
 ## [1.14.3] - 2026-03-21
 
 ### Security
