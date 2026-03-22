@@ -1,3 +1,13 @@
+"""Evaluation metrics for RAG answer quality.
+
+Provides two complementary quality signals:
+
+* **Citation coverage** — what fraction of provided citations actually
+  appear in the answer text (measures citation discipline).
+* **Hallucination rate** — what fraction of the answer's content words
+  are *not* grounded in the retrieval context (measures factual drift).
+"""
+
 import re
 from typing import List, Dict
 
@@ -14,8 +24,13 @@ _STOP_WORDS = frozenset(
 
 
 def calculate_citation_coverage(answer: str, citations: List[Dict]) -> float:
-    # A simple heuristic: check if citation IDs (e.g., [doc_1]) appear in the answer.
-    # Returns % of provided citations that are actually used in the answer text.
+    """Return the fraction of *citations* whose ``doc_id`` appears in *answer*.
+
+    Checks for both ``[doc_id]`` bracket notation and bare ``doc_id`` strings.
+    Entries with ``None`` doc_id are silently skipped (don't inflate the
+    denominator).  Returns 0.0 when *citations* is empty or all entries
+    have ``None`` doc_ids.
+    """
     if not citations:
         return 0.0
 

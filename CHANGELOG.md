@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.14.5] - 2026-03-22
+
+### Changed
+- **Docstrings for 4 undocumented modules** — added module-level and function-level docstrings to `timing.py` (measure_latency decorator), `metrics.py` (calculate_citation_coverage + module overview), `evaluate.py` (run_evaluation + EVAL_DATA + module overview), and `ingest.py` (load_documents + ingest + module overview). Every public function in the codebase now has a docstring.
+
+### Fixed
+- **README test table stale entries** — removed two duplicate entries for non-existent `test_security_audit.py`, added missing `test_contracts.py` (35 tests) and `test_chunked_bypass.py` (8 tests); table now matches the actual 17 test suites on disk
+- **README suite count** — corrected "18 suites" → "17 suites"
+- **README security layer count inconsistency** — badge said 18, body text oscillated between 15 and 18; normalized to 15 (matching the actual CWE mapping table)
+
 ## [1.14.4] - 2026-03-21
 
 ### Fixed

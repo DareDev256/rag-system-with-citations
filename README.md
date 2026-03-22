@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-421_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-18-e05d44?style=flat-square&logo=shield)
+![Security](https://img.shields.io/badge/defense_layers-15-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 15-layer defense-in-depth security.
 
@@ -199,7 +199,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-421 tests across 18 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+421 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -219,11 +219,11 @@ pytest tests/ -v
 | `test_resilience.py` | 16 | File I/O failures, corrupted state, singleton poisoning |
 | `test_llm.py` | 14 | Sync LLM mocks — classification, synthesis, error handling |
 | `test_llm_async.py` | 14 | Async LLM mocks — parity with sync implementations |
+| `test_contracts.py` | 35 | Behavioral interface tests — prompt safety, client factories, citation patterns |
 | `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
 | `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
-| `test_security_audit.py` | 10 | Chunked TE bypass, GET auth narrowing, env var upper bounds |
 | `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
-| `test_security_audit.py` | 10 | Chunked TE bypass, GET auth narrowing, env var upper bounds |
+| `test_chunked_bypass.py` | 8 | Chunked encoding enforcement, early abort, multi-chunk accumulation |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
 
@@ -292,7 +292,7 @@ src/
     ├── ip.py            # Trusted proxy IP resolution
     └── timing.py        # Latency measurement decorator
 ```
-18-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation (null byte rejection, control char blocking, parameter pollution prevention, Content-Type enforcement), output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+15-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 

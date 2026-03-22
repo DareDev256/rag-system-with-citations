@@ -1,3 +1,14 @@
+"""Document ingestion pipeline — load, chunk, embed, and index.
+
+Reads ``.txt`` files from the corpus directory, splits them into
+paragraph-level chunks, generates embeddings via Sentence Transformers,
+and writes a FAISS index + JSON metadata to ``data_store/``.
+
+Usage::
+
+    python -m src.data.ingest
+"""
+
 import glob
 import logging
 import os
@@ -10,7 +21,17 @@ logger = logging.getLogger(__name__)
 CORPUS_DIR = "src/data/corpus"
 INDEX_DIR = "data_store"
 
+
 def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
+    """Load and chunk ``.txt`` files from *corpus_dir* into document dicts.
+
+    Each paragraph (split on double newlines) becomes a separate document
+    with keys ``doc_id`` (``<filename>_<index>``), ``text``, and ``source``.
+    Applies a path-traversal guard via ``os.path.realpath`` and skips files
+    that fail to read (permission denied, encoding errors).
+
+    Returns an empty list if *corpus_dir* does not exist.
+    """
     docs = []
     if not os.path.exists(corpus_dir):
         logger.warning("Corpus directory %s does not exist.", corpus_dir)
@@ -46,6 +67,12 @@ def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
     return docs
 
 def ingest():
+    """Run the full ingestion pipeline: load → embed → index → save.
+
+    Creates ``data_store/`` if it doesn't exist, embeds all document
+    chunks with the configured Sentence Transformers model, builds a
+    FAISS index, and persists it alongside JSON metadata.
+    """
     logger.info("Starting ingestion...")
     
     # Ensure index dir exists

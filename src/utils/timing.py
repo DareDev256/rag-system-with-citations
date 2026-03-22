@@ -1,10 +1,26 @@
+"""Latency measurement decorator for pipeline instrumentation.
+
+Automatically injects ``latency_ms`` into the wrapped function's return
+value (dict or object with a ``latency_ms`` attribute), giving every
+pipeline stage free timing without manual ``perf_counter`` bookkeeping.
+"""
+
 import time
 import functools
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 def measure_latency(func):
+    """Decorator that times *func* and injects ``latency_ms`` into its result.
+
+    If the result is a ``dict`` without a ``latency_ms`` key, the key is
+    added.  If the result is an object with a ``latency_ms`` attribute, the
+    attribute is set.  Other return types pass through unchanged.
+
+    Timing uses ``time.perf_counter`` for sub-millisecond resolution.
+    """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start_time = time.perf_counter()

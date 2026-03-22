@@ -1,3 +1,14 @@
+"""Offline evaluation pipeline for the RAG system.
+
+Runs a fixed set of queries through the full pipeline (retrieve → synthesize),
+measures latency, citation coverage, and keyword recall, then writes results
+to ``reports/eval_results.csv`` for trend tracking.
+
+Usage::
+
+    python -m src.eval.evaluate
+"""
+
 import logging
 import os
 import time
@@ -8,13 +19,21 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
+#: Built-in evaluation queries with expected keywords for recall checking.
 EVAL_DATA = [
     {"query": "What is RAG?", "expected_keywords": ["retrieval", "generation", "LLM"]},
     {"query": "Who walked on the moon?", "expected_keywords": ["Neil Armstrong", "Buzz Aldrin"]},
     {"query": "Tell me about Apollo 11.", "expected_keywords": ["1969", "Eagle"]}
 ]
 
+
 def run_evaluation():
+    """Execute the evaluation pipeline and save results to CSV.
+
+    For each query in :data:`EVAL_DATA`, runs the full RAG pipeline,
+    computes citation coverage and keyword recall, then writes a
+    ``reports/eval_results.csv`` with per-query metrics.
+    """
     logger.info("Starting evaluation...")
     results = []
     
