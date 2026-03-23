@@ -276,7 +276,7 @@ src/
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls (sync + async), confidence scoring — [design doc](docs/llm-synthesis.md)
+│   └── synthesize.py    # LLM calls (sync + async), confidence scoring, doc_id helpers — [design doc](docs/llm-synthesis.md)
 ├── retrieval/
 │   ├── embed.py         # Sentence Transformers embedder (singleton)
 │   ├── search.py        # Search orchestration layer

@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.15.0] - 2026-03-23
+
+### Changed
+- **Extracted `get_available_doc_ids()` helper** (`src/llm/synthesize.py`) — the set comprehension `{res["doc_id"] for res in search_results if res.get("doc_id")}` was duplicated across `_parse_synthesis()`, `calculate_confidence()`, and `build_diagnostics()`. Consolidated into a single reusable function that filters None/empty doc_ids, eliminating triple computation and ensuring consistent None-filtering across the pipeline
+- **Eliminated redundant recomputation in `_parse_synthesis` → `calculate_confidence`** — `_parse_synthesis` already computed `available_ids` but passed raw `search_results` to `calculate_confidence`, which recomputed the same set. Added `_available_ids` keyword-only parameter for internal pass-through; public API unchanged
+
+### Fixed
+- **`build_diagnostics` None doc_id in available_ids set** — `response.py` used `{res["doc_id"] for res in search_results}` without filtering None doc_ids, unlike the two equivalent computations in `synthesize.py`. A search result with `None` doc_id would pollute the `available_ids` set, potentially masking hallucinated `[None]` citations in diagnostics. Now uses `get_available_doc_ids()` with consistent None-filtering
+
 ## [1.14.5] - 2026-03-22
 
 ### Changed

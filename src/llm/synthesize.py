@@ -76,6 +76,17 @@ async def get_async_llm_client():
 CITATION_PATTERN = re.compile(r'\[([^\]]+)\]')
 
 
+def get_available_doc_ids(search_results: List[Dict]) -> Set[str]:
+    """Extract the set of valid (non-None) doc_ids from search results.
+
+    Centralizes the doc_id extraction logic used across the synthesis and
+    diagnostics pipeline — confidence scoring, citation filtering, and
+    hallucination detection all need this same set.  Filters out None/empty
+    doc_ids so downstream comparisons don't false-match on broken metadata.
+    """
+    return {res["doc_id"] for res in search_results if res.get("doc_id")}
+
+
 def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None) -> Set[str]:
     """Extract all [doc_id] citations from the answer text.
 
@@ -89,12 +100,22 @@ def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None)
     return cited
 
 
-def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set[str]) -> float:
+def calculate_confidence(
+    answer: str,
+    search_results: List[Dict],
+    cited_ids: Set[str],
+    *,
+    _available_ids: Optional[Set[str]] = None,
+) -> float:
     """
     Calculate confidence score based on:
     - Citation coverage: % of retrieved docs that were cited
     - Grounding check: Whether the answer uses citations at all
     - Refusal detection: Lower confidence if LLM refused to answer
+
+    The optional ``_available_ids`` kwarg lets callers that have already
+    computed the valid doc-id set (e.g. ``_parse_synthesis``) skip the
+    redundant recomputation.
     """
     if not search_results:
         return 0.0
@@ -115,8 +136,8 @@ def calculate_confidence(answer: str, search_results: List[Dict], cited_ids: Set
     if not cited_ids:
         return 0.3
 
-    # Calculate citation coverage — filter None doc_ids to prevent false matches
-    available_ids = {res["doc_id"] for res in search_results if res.get("doc_id")}
+    # Reuse pre-computed set when available; otherwise compute on the fly
+    available_ids = _available_ids if _available_ids is not None else get_available_doc_ids(search_results)
     valid_citations = cited_ids & available_ids
 
     if not valid_citations:
@@ -160,7 +181,7 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
     """Parse LLM synthesis response into answer dict with citations and confidence."""
     answer = response.choices[0].message.content.strip()
 
-    available_ids = {res["doc_id"] for res in search_results if res.get("doc_id")}
+    available_ids = get_available_doc_ids(search_results)
     cited_ids = extract_cited_doc_ids(answer, available_ids)
 
     citations_used = [res for res in search_results if res.get("doc_id") in cited_ids]
@@ -169,7 +190,9 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
     if not citations_used and search_results:
         citations_used = search_results[:1]
 
-    confidence = calculate_confidence(answer, search_results, cited_ids)
+    confidence = calculate_confidence(
+        answer, search_results, cited_ids, _available_ids=available_ids,
+    )
 
     return {
         "answer": answer,

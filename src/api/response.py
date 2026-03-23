@@ -8,7 +8,7 @@ clean pipeline orchestrator.
 from typing import Dict, List, Optional
 
 from src.api.schemas import Citation, Diagnostics
-from src.llm.synthesize import extract_cited_doc_ids
+from src.llm.synthesize import extract_cited_doc_ids, get_available_doc_ids
 
 
 def _sanitize_field(text: str, sanitize_fn) -> str:
@@ -48,7 +48,7 @@ def build_diagnostics(
     Separated from the endpoint so diagnostics logic can be tested without
     standing up the full HTTP stack.
     """
-    available_ids = {res["doc_id"] for res in search_results}
+    available_ids = get_available_doc_ids(search_results)
     all_cited = extract_cited_doc_ids(answer)
     hallucinated = sorted(all_cited - available_ids)
     valid_cited = all_cited & available_ids
