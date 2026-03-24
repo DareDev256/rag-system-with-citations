@@ -194,7 +194,8 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ### Deep Dives
 
-- **[LLM Synthesis Design](docs/llm-synthesis.md)** — confidence scoring algorithm, citation extraction, sync/async parity, error fallback strategy, client singleton management
+- **[Security Architecture](docs/security.md)** — full threat model, 15-layer CWE mapping, configuration reference, known gaps
+- **[Proxy Integration](docs/proxy-integration.md)** — LiteLLM, OpenRouter, Ollama, vLLM setup guides
 - **[SocialBu MCP Integration](docs/socialbu-mcp-integration.md)** — connect AI agents to SocialBu for automated social media posting via MCP + OpenAPI proxy
 
 ## Testing
@@ -245,6 +246,8 @@ All settings via environment variables or `.env`:
 | `MAX_BODY_BYTES` | `65536` | Request body size limit (413 on exceed) |
 | `TRUSTED_PROXY_COUNT` | `0` | Reverse proxies for X-Forwarded-For extraction |
 | `CSP_POLICY` | strict default | Content-Security-Policy override |
+| `CORS_ORIGINS` | — | Comma-separated allowed origins (CORS disabled when unset) |
+| `DISABLE_DOCS` | — | Set to any value to hide `/docs` and `/redoc` in production |
 | `HSTS_MAX_AGE` | `63072000` | HSTS max-age (seconds) |
 
 Every response includes `X-Request-ID` for incident traceability (auto-generated or pass your own, max 64 chars).
@@ -276,7 +279,7 @@ src/
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls (sync + async), confidence scoring, doc_id helpers — [design doc](docs/llm-synthesis.md)
+│   └── synthesize.py    # LLM calls (sync + async), confidence scoring, doc_id helpers
 ├── retrieval/
 │   ├── embed.py         # Sentence Transformers embedder (singleton)
 │   ├── search.py        # Search orchestration layer
