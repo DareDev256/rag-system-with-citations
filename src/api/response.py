@@ -52,7 +52,7 @@ def build_diagnostics(
     all_cited = extract_cited_doc_ids(answer)
     hallucinated = sorted(all_cited - available_ids)
     valid_cited = all_cited & available_ids
-    coverage = len(valid_cited) / len(search_results) if search_results else 0.0
+    coverage = len(valid_cited) / len(available_ids) if available_ids else 0.0
 
     return Diagnostics(
         retrieval_ms=round(retrieval_ms, 2),

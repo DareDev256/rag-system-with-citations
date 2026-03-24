@@ -144,6 +144,34 @@ class TestBuildDiagnostics:
         assert diag.documents_searched == 0
         assert "doc_1" in diag.hallucinated_citations
 
+    def test_none_doc_ids_excluded_from_coverage_denominator(self):
+        """None doc_ids must not inflate the denominator — regression for
+        the same bug fixed in calculate_confidence (v1.10.1) but missed
+        in build_diagnostics.  With 2 valid + 1 None doc_id, citing 1
+        valid doc should yield 0.5, not 0.33."""
+        results_with_none = [
+            {"doc_id": "doc_1", "snippet": "s1", "score": 0.9, "source": "a.txt"},
+            {"doc_id": None, "snippet": "broken", "score": 0.5},
+            {"doc_id": "doc_2", "snippet": "s2", "score": 0.7, "source": "b.txt"},
+        ]
+        answer = "Per [doc_1], the answer is yes."
+        diag = build_diagnostics(results_with_none, answer, 1.0, 2.0)
+        # 1 cited out of 2 valid = 0.5  (NOT 1/3 ≈ 0.33)
+        assert diag.citation_coverage == 0.5
+        assert diag.documents_searched == 3  # total results unchanged
+
+    def test_all_none_doc_ids_zero_coverage(self):
+        """When every result has None doc_id, coverage should be 0.0,
+        not a ZeroDivisionError."""
+        results_all_none = [
+            {"doc_id": None, "snippet": "s1", "score": 0.9},
+            {"doc_id": None, "snippet": "s2", "score": 0.5},
+        ]
+        answer = "Some answer [doc_1]."
+        diag = build_diagnostics(results_all_none, answer, 1.0, 1.0)
+        assert diag.citation_coverage == 0.0
+        assert "doc_1" in diag.hallucinated_citations
+
     def test_timing_rounded(self):
         diag = build_diagnostics(_SEARCH_RESULTS, "hello", 1.23456, 7.89012)
         assert diag.retrieval_ms == 1.23

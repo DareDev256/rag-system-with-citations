@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.15.1] - 2026-03-24
+
+### Fixed
+- **`build_diagnostics` coverage denominator inflated by None doc_ids** — `citation_coverage` in diagnostics divided by `len(search_results)` instead of `len(available_ids)`, so search results with `None`/empty doc_ids deflated the coverage ratio. This was the same class of bug fixed in `calculate_confidence` back in v1.10.1 but missed in the diagnostics path. Now both metrics use the same denominator (`available_ids`), producing consistent coverage values. Also prevents `ZeroDivisionError` when all results have `None` doc_ids.
+
+### Added
+- 2 new regression tests: None doc_id denominator exclusion, all-None doc_id zero-division guard — 423 tests total
+
 ## [1.15.0] - 2026-03-23
 
 ### Changed

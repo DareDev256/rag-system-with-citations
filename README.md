@@ -24,7 +24,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **15-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing, webhook HMAC verification
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **421 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **423 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -200,7 +200,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-421 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+423 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -211,7 +211,7 @@ pytest tests/ -v
 | `test_hardening.py` | 81 | Security headers, prompt injection, rate limiting, error sanitization |
 | `test_core.py` | 50 | Citation extraction, confidence scoring, schema validation, metrics |
 | `test_edge_cases.py` | 49 | Unicode, boundary values, type coercion, hallucination edge cases |
-| `test_response_builders.py` | 28 | Citation assembly, diagnostics math, LLM output parsing |
+| `test_response_builders.py` | 30 | Citation assembly, diagnostics math, LLM output parsing |
 | `test_search.py` | 19 | Embedder singleton, search orchestration, model failure recovery |
 | `test_integration_gaps.py` | 18 | Lifespan, ingest pipeline, client factories, race conditions |
 | `test_ip_resolution.py` | 18 | Proxy extraction, spoofing resistance, IPv6, fallback |
