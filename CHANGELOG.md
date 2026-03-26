@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.15.2] - 2026-03-26
+
+### Fixed
+- **`calculate_confidence` implicit zero-division guard made explicit** — when all search results have None/empty doc_ids, `available_ids` is empty; the division at `len(valid_citations) / len(available_ids)` was only protected transitively (empty `available_ids` → empty `valid_citations` → early return). Added an explicit `if not available_ids` guard so a future reordering can't introduce a `ZeroDivisionError`
+
+### Added
+- 2 new regression tests: all-None doc_ids and all-empty-string doc_ids zero-division guards in `calculate_confidence` — 425 tests total
+
 ## [1.15.1] - 2026-03-24
 
 ### Fixed

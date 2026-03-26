@@ -143,6 +143,12 @@ def calculate_confidence(
     if not valid_citations:
         return 0.3  # Citations don't match available docs
 
+    # Explicit guard: all search results had None/empty doc_ids.
+    # (valid_citations check above catches this transitively, but an
+    # explicit guard prevents regressions if the logic is reordered.)
+    if not available_ids:
+        return 0.3
+
     # Base confidence from citation ratio — use available_ids (not search_results)
     # so broken metadata entries with None doc_ids don't deflate the score.
     citation_ratio = len(valid_citations) / len(available_ids)

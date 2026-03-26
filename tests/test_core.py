@@ -124,6 +124,25 @@ class TestCalculateConfidence:
         # 0.6 + 0.4 * (1/3) = 0.7333... → rounded to 0.73
         assert confidence == 0.73
 
+    def test_all_none_doc_ids_no_division_by_zero(self):
+        """When every search result has a None doc_id, available_ids is empty.
+
+        The function must not raise ZeroDivisionError — it should return 0.3
+        (citations present but none match real docs).
+        """
+        results = [{"doc_id": None}, {"doc_id": None}]
+        cited = {"doc_001"}
+        assert calculate_confidence("Answer [doc_001].", results, cited) == 0.3
+
+    def test_empty_string_doc_ids_no_division_by_zero(self):
+        """Empty-string doc_ids are filtered by get_available_doc_ids (falsy).
+
+        Same zero-division guard as None doc_ids — available_ids is empty.
+        """
+        results = [{"doc_id": ""}, {"doc_id": ""}]
+        cited = {"doc_001"}
+        assert calculate_confidence("Answer [doc_001].", results, cited) == 0.3
+
 
 # ── Citation schema ──────────────────────────────────────────────
 
