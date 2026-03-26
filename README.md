@@ -294,7 +294,7 @@ src/
 └── utils/
     ├── env.py           # Safe env var parsing (bounded int)
     ├── ip.py            # Trusted proxy IP resolution
-    └── timing.py        # Latency measurement decorator
+    └── timing.py        # Latency decorator + TimingContext context manager
 ```
 15-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 

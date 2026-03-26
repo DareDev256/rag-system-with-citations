@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.16.0] - 2026-03-26
+
+### Changed
+- **Introduced `TimingContext` context manager** (`src/utils/timing.py`) — replaces the repetitive `start = perf_counter(); …; ms = (perf_counter() - start) * 1000` pattern that appeared 3 times in `query_endpoint` and once in `run_evaluation`. Eliminates 4 manual timing blocks with clean, reusable `with TimingContext() as t:` syntax
+- **Refactored `query_endpoint`** (`src/api/main.py`) — 3 manual perf_counter timing blocks (total, retrieval, synthesis) replaced with nested `TimingContext` context managers. Removed `import time` dependency
+- **Refactored `run_evaluation`** (`src/eval/evaluate.py`) — manual pipeline timing replaced with `TimingContext`. Removed `import time` dependency
+
 ## [1.15.2] - 2026-03-26
 
 ### Fixed

@@ -9,7 +9,6 @@ the retrieval, LLM, and response-builder modules. Security enforcement
 import logging
 import os
 import re
-import time
 
 from contextlib import asynccontextmanager
 
@@ -30,6 +29,7 @@ from src.api.response import build_citations, build_diagnostics
 from src.retrieval.search import perform_search
 from src.llm.synthesize import classify_query_async, synthesize_answer_async
 from src.utils.ip import resolve_client_ip
+from src.utils.timing import TimingContext
 
 # Logs
 logging.basicConfig(level=logging.INFO)
@@ -47,7 +47,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.15.2",
+    version="1.16.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -106,41 +106,37 @@ async def query_endpoint(request: QueryRequest, req: Request):
     if not check_rate_limit(client_ip):
         raise HTTPException(status_code=429, detail="Rate limit exceeded. Try again later.")
 
-    start_total = time.perf_counter()
-    original_query = request.query
+    with TimingContext() as total_timer:
+        original_query = request.query
 
-    # 1. Classify
-    category = await classify_query_async(original_query)
-    safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
-    request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
-    logger.info("Query: %s | Category: %s | request_id=%s", safe_query, category, request_id)
+        # 1. Classify
+        category = await classify_query_async(original_query)
+        safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
+        request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
+        logger.info("Query: %s | Category: %s | request_id=%s", safe_query, category, request_id)
 
-    # 2. Rewrite if ambiguous
-    final_query = original_query
-    if category == "ambiguous":
-        pass
+        # 2. Rewrite if ambiguous
+        final_query = original_query
+        if category == "ambiguous":
+            pass
 
-    # 3. Retrieve
-    start_retrieval = time.perf_counter()
-    search_results = perform_search(final_query, k=request.k)
-    retrieval_ms = (time.perf_counter() - start_retrieval) * 1000
+        # 3. Retrieve
+        with TimingContext() as retrieval_timer:
+            search_results = perform_search(final_query, k=request.k)
 
-    # 4. Synthesize
-    start_synthesis = time.perf_counter()
-    synthesis_result = await synthesize_answer_async(final_query, search_results)
-    synthesis_ms = (time.perf_counter() - start_synthesis) * 1000
+        # 4. Synthesize
+        with TimingContext() as synthesis_timer:
+            synthesis_result = await synthesize_answer_async(final_query, search_results)
 
-    # 5. Format Response
-    citations = build_citations(search_results, synthesis_result, sanitize_output)
-
-    end_total = time.perf_counter()
-    latency = (end_total - start_total) * 1000
+        # 5. Format Response
+        citations = build_citations(search_results, synthesis_result, sanitize_output)
 
     # 6. Diagnostics (opt-in)
     diagnostics = None
     if request.include_diagnostics:
         diagnostics = build_diagnostics(
-            search_results, synthesis_result["answer"], retrieval_ms, synthesis_ms,
+            search_results, synthesis_result["answer"],
+            retrieval_timer.ms, synthesis_timer.ms,
         )
 
     return QueryResponse(
@@ -149,7 +145,7 @@ async def query_endpoint(request: QueryRequest, req: Request):
         answer=sanitize_output(synthesis_result["answer"]),
         citations=citations,
         confidence=synthesis_result["confidence"],
-        latency_ms=round(latency, 2),
+        latency_ms=total_timer.ms,
         diagnostics=diagnostics,
     )
 

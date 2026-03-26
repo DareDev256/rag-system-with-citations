@@ -11,10 +11,10 @@ Usage::
 
 import logging
 import os
-import time
 from src.retrieval.search import perform_search
 from src.llm.synthesize import synthesize_answer
 from src.eval.metrics import calculate_citation_coverage
+from src.utils.timing import TimingContext
 import pandas as pd
 
 logger = logging.getLogger(__name__)
@@ -39,14 +39,12 @@ def run_evaluation():
     
     for item in EVAL_DATA:
         query = item["query"]
-        start_t = time.perf_counter()
-        
+
         # 1. Pipeline
-        search_res = perform_search(query, k=3)
-        synth_res = synthesize_answer(query, search_res)
-        
-        latency = (time.perf_counter() - start_t) * 1000
-        
+        with TimingContext() as pipeline_timer:
+            search_res = perform_search(query, k=3)
+            synth_res = synthesize_answer(query, search_res)
+
         answer = synth_res["answer"]
         citations = synth_res.get("citations_used", [])
         
@@ -58,7 +56,7 @@ def run_evaluation():
         
         results.append({
             "query": query,
-            "latency_ms": latency,
+            "latency_ms": pipeline_timer.ms,
             "citation_coverage": coverage,
             "keyword_match": hit,
             "answer_length": len(answer)

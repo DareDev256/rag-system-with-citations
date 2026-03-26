@@ -1,8 +1,12 @@
-"""Latency measurement decorator for pipeline instrumentation.
+"""Latency measurement utilities for pipeline instrumentation.
 
-Automatically injects ``latency_ms`` into the wrapped function's return
-value (dict or object with a ``latency_ms`` attribute), giving every
-pipeline stage free timing without manual ``perf_counter`` bookkeeping.
+Provides two complementary timing tools:
+
+* **measure_latency** — decorator that auto-injects ``latency_ms`` into a
+  function's return value.
+* **TimingContext** — context manager for inline timing blocks, replacing
+  the repetitive ``start = perf_counter(); …; ms = (perf_counter() - start) * 1000``
+  pattern used across the query endpoint and evaluation pipeline.
 """
 
 import time
@@ -10,6 +14,31 @@ import functools
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+class TimingContext:
+    """Context manager that captures elapsed wall-clock time in milliseconds.
+
+    Usage::
+
+        with TimingContext() as t:
+            do_work()
+        print(t.ms)  # elapsed milliseconds (float, rounded to 2dp)
+    """
+
+    __slots__ = ("ms", "_start")
+
+    def __init__(self) -> None:
+        self.ms: float = 0.0
+        self._start: float = 0.0
+
+    def __enter__(self) -> "TimingContext":
+        self._start = time.perf_counter()
+        return self
+
+    def __exit__(self, *exc) -> bool:
+        self.ms = round((time.perf_counter() - self._start) * 1000, 2)
+        return False
 
 
 def measure_latency(func):
