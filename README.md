@@ -4,9 +4,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-423_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-15-e05d44?style=flat-square&logo=shield)
+![Security](https://img.shields.io/badge/defense_layers-16-e05d44?style=flat-square&logo=shield)
 
-A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 15-layer defense-in-depth security.
+A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 16-layer defense-in-depth security.
 
 **Every answer must cite its sources. If it can't, the confidence score reflects that.**
 
@@ -21,7 +21,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **Citation-enforced answers** — LLM must reference `[doc_id]` from retrieved context or confidence drops to 0.3
 - **Real confidence scoring** — calculated from citation coverage ratio, not model self-assessment
 - **Hallucination detection** — flags citations that reference documents not in the retrieval set
-- **15-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing, webhook HMAC verification
+- **16-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing, SSRF prevention, webhook HMAC verification
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
 - **423 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
@@ -170,7 +170,7 @@ Real metric, not model self-assessment:
 
 ## Security
 
-15-layer defense-in-depth. Each layer maps to a specific CWE threat class:
+16-layer defense-in-depth. Each layer maps to a specific CWE threat class:
 
 | Layer | Defense | CWE |
 |-------|---------|-----|
@@ -189,12 +189,13 @@ Real metric, not model self-assessment:
 | 13 | Embedding model name validation | CWE-94 |
 | 14 | Non-root Docker container | CWE-250 |
 | 15 | Webhook HMAC-SHA256 signature verification | CWE-345 |
+| 16 | SSRF prevention on proxy URL (scheme validation) | CWE-918 |
 
 Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ### Deep Dives
 
-- **[Security Architecture](docs/security.md)** — full threat model, 15-layer CWE mapping, configuration reference, known gaps
+- **[Security Architecture](docs/security.md)** — full threat model, 16-layer CWE mapping, configuration reference, known gaps
 - **[Proxy Integration](docs/proxy-integration.md)** — LiteLLM, OpenRouter, Ollama, vLLM setup guides
 - **[SocialBu MCP Integration](docs/socialbu-mcp-integration.md)** — connect AI agents to SocialBu for automated social media posting via MCP + OpenAPI proxy
 
@@ -236,11 +237,11 @@ All settings via environment variables or `.env`:
 |----------|---------|-------------|
 | `OPENAI_API_KEY` | — | **Required.** OpenAI API key (or proxy key) |
 | `API_KEYS` | — | Comma-separated keys for `/query` auth |
-| `OPENAI_BASE_URL` | — | Route through any OpenAI-compatible proxy |
+| `OPENAI_BASE_URL` | — | Route through any OpenAI-compatible proxy (HTTPS/HTTP only, SSRF-validated) |
 | `SYNTHESIS_MODEL` | `gpt-4o-mini` | Answer generation model |
 | `CLASSIFICATION_MODEL` | `gpt-4o-mini` | Query classification model |
 | `EMBEDDING_MODEL` | `all-MiniLM-L6-v2` | Sentence Transformers embedding model |
-| `LLM_TIMEOUT` | `30` | OpenAI request timeout (seconds) |
+| `LLM_TIMEOUT` | `30` | OpenAI request timeout (1–300 seconds) |
 | `WEBHOOK_SECRET` | — | HMAC-SHA256 secret for `/webhook/reindex` (disabled when unset) |
 | `RATE_LIMIT_RPM` | `30` | Max requests/min per IP |
 | `MAX_BODY_BYTES` | `65536` | Request body size limit (413 on exceed) |
