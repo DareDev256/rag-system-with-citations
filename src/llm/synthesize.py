@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import logging
 import os
 import re
@@ -100,6 +101,42 @@ def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None)
     return cited
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class CitationAnalysis:
+    """Pre-computed citation metrics for an answer + search-results pair.
+
+    Consolidates the citation set math that was previously duplicated across
+    ``_parse_synthesis`` and ``build_diagnostics`` — available IDs, cited IDs,
+    valid/hallucinated partitions, and coverage ratio are all computed once.
+    """
+    available_ids: frozenset
+    all_cited_ids: frozenset
+    valid_cited_ids: frozenset
+    hallucinated_ids: frozenset
+    coverage: float
+
+
+def analyze_citations(answer: str, search_results: List[Dict]) -> CitationAnalysis:
+    """Run full citation analysis in a single pass.
+
+    Returns a frozen dataclass with every citation metric the pipeline needs,
+    eliminating redundant ``get_available_doc_ids`` / ``extract_cited_doc_ids``
+    calls across the synthesis and diagnostics code paths.
+    """
+    available = get_available_doc_ids(search_results)
+    all_cited = extract_cited_doc_ids(answer)
+    valid = all_cited & available
+    hallucinated = all_cited - available
+    coverage = round(len(valid) / len(available), 2) if available else 0.0
+    return CitationAnalysis(
+        available_ids=frozenset(available),
+        all_cited_ids=frozenset(all_cited),
+        valid_cited_ids=frozenset(valid),
+        hallucinated_ids=frozenset(hallucinated),
+        coverage=coverage,
+    )
+
+
 def calculate_confidence(
     answer: str,
     search_results: List[Dict],
@@ -187,17 +224,17 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
     """Parse LLM synthesis response into answer dict with citations and confidence."""
     answer = response.choices[0].message.content.strip()
 
-    available_ids = get_available_doc_ids(search_results)
-    cited_ids = extract_cited_doc_ids(answer, available_ids)
+    analysis = analyze_citations(answer, search_results)
 
-    citations_used = [res for res in search_results if res.get("doc_id") in cited_ids]
+    citations_used = [res for res in search_results if res.get("doc_id") in analysis.valid_cited_ids]
 
     # Fallback: include top result when LLM doesn't follow citation format
     if not citations_used and search_results:
         citations_used = search_results[:1]
 
     confidence = calculate_confidence(
-        answer, search_results, cited_ids, _available_ids=available_ids,
+        answer, search_results, analysis.valid_cited_ids,
+        _available_ids=analysis.available_ids,
     )
 
     return {

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.18.0] - 2026-03-27
+
+### Changed
+- **Extracted `CitationAnalysis` dataclass and `analyze_citations()` function** (`src/llm/synthesize.py`) — the citation set math (available IDs, cited IDs, valid/hallucinated partitions, coverage ratio) was duplicated across `_parse_synthesis` and `build_diagnostics`. New frozen dataclass computes all metrics in a single pass; both callers now consume the shared analysis instead of independently calling `get_available_doc_ids` + `extract_cited_doc_ids` + inline set operations
+- **Simplified `build_diagnostics`** (`src/api/response.py`) — replaced 5 lines of manual set math with a single `analyze_citations()` call, removing the direct imports of `extract_cited_doc_ids` and `get_available_doc_ids`
+
 ## [1.17.0] - 2026-03-27
 
 ### Changed
