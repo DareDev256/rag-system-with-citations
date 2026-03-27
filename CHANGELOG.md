@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.17.0] - 2026-03-27
+
+### Changed
+- **Extracted `_safe_llm_call` / `_safe_llm_call_async` helpers** (`src/llm/synthesize.py`) — the four LLM entry points (`classify_query`, `synthesize_answer`, and their async variants) shared identical try/except/log/fallback boilerplate. New helpers encapsulate the get-client → call → parse → catch pattern, reducing each function to a declarative configuration of model, messages, parser, fallback, and label
+- **Refactored `measure_latency` decorator to use `TimingContext`** (`src/utils/timing.py`) — replaced manual `perf_counter` start/end bookkeeping with the project's own `TimingContext` context manager, eliminating the last manual timing pattern and ensuring all timing in the codebase flows through a single mechanism
+
 ## [1.16.0] - 2026-03-26
 
 ### Changed

@@ -334,8 +334,8 @@ class TestErrorSanitization:
         with patch("src.llm.synthesize.logger") as mock_logger:
             result = synth.classify_query("test")
             assert result == "exploratory"
-            log_msg = mock_logger.error.call_args[0][1]
-            assert log_msg == "RuntimeError"
+            log_args = mock_logger.error.call_args[0]
+            assert "RuntimeError" in log_args
             assert "sk-secret" not in str(mock_logger.error.call_args)
         patch.stopall()
 

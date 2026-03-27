@@ -48,20 +48,17 @@ def measure_latency(func):
     added.  If the result is an object with a ``latency_ms`` attribute, the
     attribute is set.  Other return types pass through unchanged.
 
-    Timing uses ``time.perf_counter`` for sub-millisecond resolution.
+    Internally delegates to :class:`TimingContext` for consistent timing
+    across the codebase (no manual ``perf_counter`` bookkeeping).
     """
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
-        start_time = time.perf_counter()
-        result = func(*args, **kwargs)
-        end_time = time.perf_counter()
-        latency_ms = (end_time - start_time) * 1000
-        # Check if result is a dict (like our API response) and inject latency
+        with TimingContext() as t:
+            result = func(*args, **kwargs)
         if isinstance(result, dict) and 'latency_ms' not in result:
-             result['latency_ms'] = round(latency_ms, 2)
-        elif hasattr(result, 'latency_ms'): # For objects
-             result.latency_ms = round(latency_ms, 2)
-        
-        logger.debug("Function %s took %.2fms", func.__name__, latency_ms)
+            result['latency_ms'] = t.ms
+        elif hasattr(result, 'latency_ms'):
+            result.latency_ms = t.ms
+        logger.debug("Function %s took %.2fms", func.__name__, t.ms)
         return result
     return wrapper
