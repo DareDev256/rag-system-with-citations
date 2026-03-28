@@ -44,7 +44,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
                     ┌──────────────────────────┼────────────────┐   │
                     │  Pipeline                │                │   │
                     │  ┌───────────┐  ┌────────▼───────┐       │   │
-                    │  │ Classify  │◄─┤ GPT-4o-mini    │       │   │
+                    │  │ Classify  │◄─┤ LLM Provider   │       │   │
                     │  │ Query     │  │ (configurable) │       │   │
                     │  └─────┬─────┘  └────────────────┘       │   │
                     │        │                                  │   │
@@ -298,7 +298,7 @@ src/
     ├── ip.py            # Trusted proxy IP resolution
     └── timing.py        # Latency decorator + TimingContext context manager
 ```
-15-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+16-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 
