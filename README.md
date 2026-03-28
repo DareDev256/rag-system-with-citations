@@ -20,7 +20,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 
 - **Citation-enforced answers** — LLM must reference `[doc_id]` from retrieved context or confidence drops to 0.3
 - **Real confidence scoring** — calculated from citation coverage ratio, not model self-assessment
-- **Hallucination detection** — flags citations that reference documents not in the retrieval set
+- **Hallucination detection** — flags citations that reference documents not in the retrieval set, plus a word-overlap `hallucination_rate` and composite `answer_quality_score` (0–1) in diagnostics
 - **16-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing, SSRF prevention, webhook HMAC verification
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
@@ -132,7 +132,9 @@ curl -s -X POST http://localhost:8000/query \
     "synthesis_ms": 1220.45,
     "documents_searched": 5,
     "citation_coverage": 0.2,
-    "hallucinated_citations": []
+    "hallucinated_citations": [],
+    "hallucination_rate": 0.15,
+    "answer_quality_score": 0.72
   }
 }
 ```

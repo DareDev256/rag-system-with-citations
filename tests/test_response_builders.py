@@ -108,7 +108,7 @@ class TestBuildDiagnostics:
     def test_full_coverage(self):
         """Answer cites all retrieved docs → coverage = 1.0."""
         answer = "Based on [doc_1] and [doc_2] and [doc_3], yes."
-        diag = build_diagnostics(_SEARCH_RESULTS, answer, 12.345, 45.678)
+        diag = build_diagnostics(_SEARCH_RESULTS, answer, 12.345, 45.678, 0.85)
         assert isinstance(diag, Diagnostics)
         assert diag.citation_coverage == 1.0
         assert diag.hallucinated_citations == []
@@ -116,30 +116,30 @@ class TestBuildDiagnostics:
 
     def test_partial_coverage(self):
         answer = "According to [doc_1], yes."
-        diag = build_diagnostics(_SEARCH_RESULTS, answer, 10.0, 20.0)
+        diag = build_diagnostics(_SEARCH_RESULTS, answer, 10.0, 20.0, 0.7)
         assert diag.citation_coverage == pytest.approx(1 / 3, abs=0.01)
 
     def test_no_citations_zero_coverage(self):
         answer = "The sky is blue."
-        diag = build_diagnostics(_SEARCH_RESULTS, answer, 5.0, 10.0)
+        diag = build_diagnostics(_SEARCH_RESULTS, answer, 5.0, 10.0, 0.3)
         assert diag.citation_coverage == 0.0
 
     def test_hallucinated_citation_detected(self):
         """Citation not in search results is flagged as hallucinated."""
         answer = "Per [doc_1] and [phantom_doc], definitely."
-        diag = build_diagnostics(_SEARCH_RESULTS, answer, 1.0, 2.0)
+        diag = build_diagnostics(_SEARCH_RESULTS, answer, 1.0, 2.0, 0.7)
         assert "phantom_doc" in diag.hallucinated_citations
         assert "doc_1" not in diag.hallucinated_citations
 
     def test_hallucinated_sorted_alphabetically(self):
         answer = "[zebra_doc] and [alpha_doc] say so."
-        diag = build_diagnostics(_SEARCH_RESULTS, answer, 1.0, 1.0)
+        diag = build_diagnostics(_SEARCH_RESULTS, answer, 1.0, 1.0, 0.3)
         assert diag.hallucinated_citations == ["alpha_doc", "zebra_doc"]
 
     def test_empty_search_results(self):
         """No docs retrieved → coverage 0, everything is hallucinated."""
         answer = "[doc_1] says yes."
-        diag = build_diagnostics([], answer, 0.0, 0.0)
+        diag = build_diagnostics([], answer, 0.0, 0.0, 0.0)
         assert diag.citation_coverage == 0.0
         assert diag.documents_searched == 0
         assert "doc_1" in diag.hallucinated_citations
@@ -155,7 +155,7 @@ class TestBuildDiagnostics:
             {"doc_id": "doc_2", "snippet": "s2", "score": 0.7, "source": "b.txt"},
         ]
         answer = "Per [doc_1], the answer is yes."
-        diag = build_diagnostics(results_with_none, answer, 1.0, 2.0)
+        diag = build_diagnostics(results_with_none, answer, 1.0, 2.0, 0.7)
         # 1 cited out of 2 valid = 0.5  (NOT 1/3 ≈ 0.33)
         assert diag.citation_coverage == 0.5
         assert diag.documents_searched == 3  # total results unchanged
@@ -168,12 +168,12 @@ class TestBuildDiagnostics:
             {"doc_id": None, "snippet": "s2", "score": 0.5},
         ]
         answer = "Some answer [doc_1]."
-        diag = build_diagnostics(results_all_none, answer, 1.0, 1.0)
+        diag = build_diagnostics(results_all_none, answer, 1.0, 1.0, 0.3)
         assert diag.citation_coverage == 0.0
         assert "doc_1" in diag.hallucinated_citations
 
     def test_timing_rounded(self):
-        diag = build_diagnostics(_SEARCH_RESULTS, "hello", 1.23456, 7.89012)
+        diag = build_diagnostics(_SEARCH_RESULTS, "hello", 1.23456, 7.89012, 0.5)
         assert diag.retrieval_ms == 1.23
         assert diag.synthesis_ms == 7.89
 

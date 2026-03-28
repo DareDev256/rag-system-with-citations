@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.0] - 2026-03-28
+
+### Added
+- **Hallucination rate in live diagnostics** — `estimate_hallucination_rate` (word-overlap heuristic, implemented since v1.3.1 but only used in offline evaluation) is now wired into the `/query` diagnostics response as `hallucination_rate` (0.0=fully grounded, 1.0=fully hallucinated), giving API consumers real-time answer groundedness visibility
+- **Composite answer quality score** — new `answer_quality_score` field (0.0–1.0) in diagnostics combines citation coverage (40%), inverse hallucination rate (35%), and confidence (25%) into a single actionable metric; `calculate_answer_quality()` added to `src/eval/metrics.py`
+- Two new fields on the `Diagnostics` Pydantic model: `hallucination_rate` (float) and `answer_quality_score` (float)
+
 ## [1.18.0] - 2026-03-27
 
 ### Changed

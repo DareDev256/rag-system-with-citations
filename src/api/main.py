@@ -47,7 +47,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.18.0",
+    version="1.19.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -137,6 +137,7 @@ async def query_endpoint(request: QueryRequest, req: Request):
         diagnostics = build_diagnostics(
             search_results, synthesis_result["answer"],
             retrieval_timer.ms, synthesis_timer.ms,
+            synthesis_result["confidence"],
         )
 
     return QueryResponse(

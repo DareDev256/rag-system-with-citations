@@ -70,3 +70,23 @@ def estimate_hallucination_rate(answer: str, context_str: str) -> float:
     context_words = _tokenize(context_str) if context_str else set()
     novel = answer_words - context_words
     return round(len(novel) / len(answer_words), 2)
+
+
+def calculate_answer_quality(
+    citation_coverage: float,
+    hallucination_rate: float,
+    confidence: float,
+) -> float:
+    """Compute a composite 0–1 answer quality score.
+
+    Combines three independent signals into a single metric:
+    - Citation coverage (40% weight) — are retrieved docs actually cited?
+    - Inverse hallucination rate (35% weight) — is the answer grounded?
+    - Confidence (25% weight) — does the citation ratio support the answer?
+
+    Returns 0.0 for completely ungrounded answers, 1.0 for perfectly
+    cited, fully grounded, high-confidence answers.
+    """
+    groundedness = max(0.0, 1.0 - hallucination_rate)
+    raw = (0.40 * citation_coverage) + (0.35 * groundedness) + (0.25 * confidence)
+    return round(min(1.0, max(0.0, raw)), 2)

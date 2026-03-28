@@ -8,6 +8,8 @@ clean pipeline orchestrator.
 from typing import Dict, List, Optional
 
 from src.api.schemas import Citation, Diagnostics
+from src.eval.metrics import estimate_hallucination_rate, calculate_answer_quality
+from src.llm.prompt import build_context_str
 from src.llm.synthesize import analyze_citations
 
 
@@ -42,13 +44,17 @@ def build_diagnostics(
     answer: str,
     retrieval_ms: float,
     synthesis_ms: float,
+    confidence: float,
 ) -> Diagnostics:
-    """Compute retrieval diagnostics: coverage, hallucinated citations, timing.
+    """Compute retrieval diagnostics: coverage, hallucination, quality, timing.
 
     Separated from the endpoint so diagnostics logic can be tested without
     standing up the full HTTP stack.
     """
     analysis = analyze_citations(answer, search_results)
+    context_str = build_context_str(search_results)
+    hallucination_rate = estimate_hallucination_rate(answer, context_str)
+    quality = calculate_answer_quality(analysis.coverage, hallucination_rate, confidence)
 
     return Diagnostics(
         retrieval_ms=round(retrieval_ms, 2),
@@ -56,4 +62,6 @@ def build_diagnostics(
         documents_searched=len(search_results),
         citation_coverage=analysis.coverage,
         hallucinated_citations=sorted(analysis.hallucinated_ids),
+        hallucination_rate=hallucination_rate,
+        answer_quality_score=quality,
     )

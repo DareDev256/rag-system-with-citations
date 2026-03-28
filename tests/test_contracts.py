@@ -171,19 +171,19 @@ class TestBuildDiagnosticsContract:
     """build_diagnostics must not crash on edge-case inputs."""
 
     def test_zero_search_results_no_division_error(self):
-        diag = build_diagnostics([], "no docs", 10.0, 20.0)
+        diag = build_diagnostics([], "no docs", 10.0, 20.0, 0.0)
         assert diag.citation_coverage == 0.0
         assert diag.documents_searched == 0
 
     def test_hallucinated_citations_detected(self):
         results = [{"doc_id": "d1"}, {"doc_id": "d2"}]
-        diag = build_diagnostics(results, "See [d1] and [phantom].", 5.0, 10.0)
+        diag = build_diagnostics(results, "See [d1] and [phantom].", 5.0, 10.0, 0.7)
         assert "phantom" in diag.hallucinated_citations
         assert diag.citation_coverage == 0.5
 
     def test_timing_rounded_to_two_decimals(self):
         results = [{"doc_id": "x"}]
-        diag = build_diagnostics(results, "[x]", 1.23456, 7.89012)
+        diag = build_diagnostics(results, "[x]", 1.23456, 7.89012, 0.8)
         assert diag.retrieval_ms == 1.23
         assert diag.synthesis_ms == 7.89
 

@@ -53,6 +53,8 @@ class Diagnostics(BaseModel):
     documents_searched: int = Field(description="Number of documents retrieved from index")
     citation_coverage: float = Field(description="Fraction of retrieved docs cited in the answer (0.0-1.0)")
     hallucinated_citations: List[str] = Field(default_factory=list, description="Citation IDs in the answer that don't match any retrieved document")
+    hallucination_rate: float = Field(description="Fraction of answer content words not grounded in retrieval context (0.0=fully grounded, 1.0=fully hallucinated)")
+    answer_quality_score: float = Field(description="Composite 0-1 quality score combining citation coverage, groundedness, and confidence")
 
 
 class QueryResponse(BaseModel):
