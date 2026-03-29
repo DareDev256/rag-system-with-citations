@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-431_passing-2ea44f?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-457_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-16-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 16-layer defense-in-depth security.
@@ -24,7 +24,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **16-layer security** — rate limiting, API auth, input validation, output sanitization, HSTS, CSP, request tracing, SSRF prevention, webhook HMAC verification
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **431 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **457 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
