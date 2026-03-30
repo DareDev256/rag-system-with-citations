@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.1] - 2026-03-30
+
+### Fixed
+- **`build_citations` crash on None/missing doc_id or snippet** — the fallback path in `_parse_synthesis` can pass search results with `None` doc_id into `build_citations`, which called `sanitize_fn(res["doc_id"])` directly, crashing with `TypeError`. Now uses `_sanitize_field` (the existing None-safe wrapper) and `.get()` for all corpus fields, preventing both `TypeError` and `KeyError`
+
+### Added
+- 4 regression tests for the `build_citations` crash path: None doc_id, None snippet, missing keys entirely, None source preservation — 429 tests total
+
 ## [1.19.0] - 2026-03-28
 
 ### Added

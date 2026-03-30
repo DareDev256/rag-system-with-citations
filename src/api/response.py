@@ -30,10 +30,10 @@ def build_citations(
     """
     return [
         Citation(
-            doc_id=sanitize_fn(res["doc_id"]),
-            snippet=sanitize_fn(res["snippet"]),
+            doc_id=_sanitize_field(res.get("doc_id"), sanitize_fn),
+            snippet=_sanitize_field(res.get("snippet"), sanitize_fn),
             score=res.get("score"),
-            source=sanitize_fn(res["source"]) if res.get("source") else None,
+            source=_sanitize_field(res.get("source"), sanitize_fn) or None,
         )
         for res in synthesis_result.get("citations_used", [])
     ]

@@ -100,6 +100,34 @@ class TestBuildCitations:
         result = build_citations(_SEARCH_RESULTS, synthesis, _strip_control)
         assert result[0].score == 0.95
 
+    def test_none_doc_id_does_not_crash(self):
+        """Fallback path can feed None doc_id — must not TypeError on sanitize."""
+        synthesis = {"citations_used": [{"doc_id": None, "snippet": "text", "score": 0.5}]}
+        result = build_citations([], synthesis, _noop_sanitize)
+        assert result[0].doc_id == ""
+        assert result[0].snippet == "text"
+
+    def test_none_snippet_does_not_crash(self):
+        """Missing snippet must not crash sanitize_fn."""
+        synthesis = {"citations_used": [{"doc_id": "d1", "snippet": None, "score": 0.5}]}
+        result = build_citations([], synthesis, _noop_sanitize)
+        assert result[0].doc_id == "d1"
+        assert result[0].snippet == ""
+
+    def test_missing_keys_does_not_crash(self):
+        """Result dict missing doc_id/snippet keys entirely — KeyError regression."""
+        synthesis = {"citations_used": [{"score": 0.5}]}
+        result = build_citations([], synthesis, _noop_sanitize)
+        assert result[0].doc_id == ""
+        assert result[0].snippet == ""
+        assert result[0].source is None
+
+    def test_none_source_stays_none(self):
+        """Source field with None value should remain None, not empty string."""
+        synthesis = {"citations_used": [{"doc_id": "d1", "snippet": "s", "source": None}]}
+        result = build_citations([], synthesis, _noop_sanitize)
+        assert result[0].source is None
+
 
 # ── build_diagnostics ─────────────────────────────────────────────
 
