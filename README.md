@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-494_passing-2ea44f?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-435_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-20-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
@@ -24,7 +24,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **20-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **442 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **435 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -203,7 +203,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-431 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+435 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -214,7 +214,7 @@ pytest tests/ -v
 | `test_hardening.py` | 81 | Security headers, prompt injection, rate limiting, error sanitization |
 | `test_core.py` | 52 | Citation extraction, confidence scoring, schema validation, metrics |
 | `test_edge_cases.py` | 49 | Unicode, boundary values, type coercion, hallucination edge cases |
-| `test_response_builders.py` | 36 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense |
+| `test_response_builders.py` | 42 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |
 | `test_search.py` | 19 | Embedder singleton, search orchestration, model failure recovery |
 | `test_integration_gaps.py` | 18 | Lifespan, ingest pipeline, client factories, race conditions |
 | `test_ip_resolution.py` | 18 | Proxy extraction, spoofing resistance, IPv6, fallback |

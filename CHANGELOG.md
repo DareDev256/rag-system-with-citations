@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.19.2] - 2026-04-01
+
+### Fixed
+- **`_sanitize_field` TypeError on non-string metadata** — JSON-loaded metadata can contain integer doc_ids (e.g. `"doc_id": 123`). The falsy check (`if text`) passed these to `re.sub()` which crashes with `TypeError: expected string or bytes-like object`. Now uses explicit `is None` check and `str()` coercion, also preserving valid falsy values like `0` that were previously silently dropped
+
+### Added
+- 6 regression tests: integer/float/zero/bool coercion in `_sanitize_field`, integer doc_id through full `build_citations` pipeline, mixed-type metadata — 435 tests total
+
 ## [1.19.1] - 2026-03-30
 
 ### Fixed

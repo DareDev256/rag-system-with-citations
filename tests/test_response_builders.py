@@ -47,6 +47,21 @@ class TestSanitizeField:
     def test_strips_control_chars(self):
         assert _sanitize_field("ok\x00bad\x01", _strip_control) == "okbad"
 
+    def test_integer_value_coerced_to_str(self):
+        """JSON metadata can have integer doc_ids — must not TypeError on re.sub."""
+        assert _sanitize_field(123, str.upper) == "123"
+
+    def test_float_value_coerced_to_str(self):
+        assert _sanitize_field(0.95, str) == "0.95"
+
+    def test_zero_preserved_not_dropped(self):
+        """0 is falsy but valid — must not be silently swallowed."""
+        assert _sanitize_field(0, str) == "0"
+
+    def test_false_preserved_not_dropped(self):
+        """False is falsy but should be coerced to 'False', not ''."""
+        assert _sanitize_field(False, str) == "False"
+
 
 # ── build_citations ───────────────────────────────────────────────
 
@@ -127,6 +142,24 @@ class TestBuildCitations:
         synthesis = {"citations_used": [{"doc_id": "d1", "snippet": "s", "source": None}]}
         result = build_citations([], synthesis, _noop_sanitize)
         assert result[0].source is None
+
+    def test_integer_doc_id_coerced_not_crash(self):
+        """JSON metadata with integer doc_id must not TypeError in sanitize_output."""
+        import re
+        real_sanitize = lambda t: re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]').sub('', t)
+        synthesis = {"citations_used": [{"doc_id": 42, "snippet": "text", "score": 0.8}]}
+        result = build_citations([], synthesis, real_sanitize)
+        assert result[0].doc_id == "42"
+        assert result[0].snippet == "text"
+
+    def test_mixed_types_in_metadata(self):
+        """Realistic scenario: JSON metadata with varied types across fields."""
+        synthesis = {"citations_used": [{
+            "doc_id": 100, "snippet": "content", "score": 0.9, "source": 7
+        }]}
+        result = build_citations([], synthesis, _noop_sanitize)
+        assert result[0].doc_id == "100"
+        assert result[0].source == "7"
 
 
 # ── build_diagnostics ─────────────────────────────────────────────

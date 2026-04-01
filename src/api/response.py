@@ -13,9 +13,17 @@ from src.llm.prompt import build_context_str
 from src.llm.synthesize import analyze_citations
 
 
-def _sanitize_field(text: str, sanitize_fn) -> str:
-    """Apply output sanitizer to a single field, handling None gracefully."""
-    return sanitize_fn(text) if text else ""
+def _sanitize_field(text, sanitize_fn) -> str:
+    """Apply output sanitizer to a single field, handling None and non-str types.
+
+    JSON metadata can contain non-string values (e.g. integer doc_ids).
+    Coerces to str before sanitizing to prevent TypeError in re.sub().
+    Uses explicit ``is None`` instead of falsy check so valid values
+    like ``0`` are preserved rather than silently dropped.
+    """
+    if text is None:
+        return ""
+    return sanitize_fn(str(text))
 
 
 def build_citations(
