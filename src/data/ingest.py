@@ -14,12 +14,12 @@ import logging
 import os
 from typing import List, Dict
 from src.retrieval.embed import get_embedder
-from src.retrieval.vector_store import VectorStore
+from src.retrieval.vector_store import DEFAULT_STORE_DIR, create_default_store
 
 logger = logging.getLogger(__name__)
 
 CORPUS_DIR = "src/data/corpus"
-INDEX_DIR = "data_store"
+INDEX_DIR = DEFAULT_STORE_DIR
 
 
 def load_documents(corpus_dir: str) -> List[Dict[str, str]]:
@@ -75,27 +75,21 @@ def ingest():
     """
     logger.info("Starting ingestion...")
     
-    # Ensure index dir exists
-    os.makedirs(INDEX_DIR, exist_ok=True)
-        
     docs = load_documents(CORPUS_DIR)
     logger.info("Loaded %d documents/chunks.", len(docs))
-    
+
     if not docs:
         logger.warning("No documents found to ingest.")
         return
 
     embedder = get_embedder()
     texts = [d["text"] for d in docs]
-    
+
     logger.info("Embedding documents...")
     embeddings = embedder.encode(texts)
-    
-    vector_store = VectorStore(
-        index_path=os.path.join(INDEX_DIR, "faiss.index"),
-        metadata_path=os.path.join(INDEX_DIR, "meta.json")
-    )
-    
+
+    vector_store = create_default_store(INDEX_DIR)
+
     # Initialize index with correct dimension
     vector_store.create_index(dimension=len(embeddings[0]))
     vector_store.add_documents(embeddings, docs)

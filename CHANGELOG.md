@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.0] - 2026-04-01
+
+### Changed
+- **Centralized data store path configuration** — extracted duplicated `data_store/faiss.index` and `data_store/meta.json` path construction from `search.py` and `ingest.py` into `vector_store.py` via `default_store_paths()` and `create_default_store()` factory. Storage layout now has a single source of truth
+- **Extracted `_tokenize` to module level in `metrics.py`** — moved from nested function inside `estimate_hallucination_rate` to module-level `_tokenize()` for independent testability and reuse across future metrics
+- Updated test mocks in `test_search.py`, `test_resilience.py`, and `test_integration_gaps.py` to use the new factory interface — 435 tests passing
+
 ## [1.19.2] - 2026-04-01
 
 ### Fixed

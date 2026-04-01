@@ -22,6 +22,35 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+# ─── Default storage layout ─────────────────────────────────────────
+# Centralizes path construction so search.py and ingest.py don't
+# independently hardcode the same directory/filenames.
+DEFAULT_STORE_DIR = "data_store"
+DEFAULT_INDEX_FILE = "faiss.index"
+DEFAULT_META_FILE = "meta.json"
+
+
+def default_store_paths(base_dir: str = DEFAULT_STORE_DIR) -> tuple:
+    """Return (index_path, meta_path) for the given base directory.
+
+    Creates the directory if it doesn't exist (exist_ok avoids TOCTOU).
+    """
+    os.makedirs(base_dir, exist_ok=True)
+    return (
+        os.path.join(base_dir, DEFAULT_INDEX_FILE),
+        os.path.join(base_dir, DEFAULT_META_FILE),
+    )
+
+
+def create_default_store(base_dir: str = DEFAULT_STORE_DIR) -> "VectorStore":
+    """Factory that creates a VectorStore with standard paths.
+
+    Single source of truth for the data_store layout — callers don't
+    need to know the internal file naming convention.
+    """
+    index_path, meta_path = default_store_paths(base_dir)
+    return VectorStore(index_path=index_path, metadata_path=meta_path)
+
 
 class VectorStore:
     """FAISS-backed vector store with parallel JSON metadata.

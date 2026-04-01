@@ -113,11 +113,10 @@ class TestEmbedderSingleton:
 
 class TestGetSearchEngine:
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.path.exists", return_value=True)
-    def test_returns_store_and_embedder(self, mock_exists, mock_vs_cls, mock_get_emb):
+    @patch("src.retrieval.search.create_default_store")
+    def test_returns_store_and_embedder(self, mock_factory, mock_get_emb):
         mock_store = MagicMock()
-        mock_vs_cls.return_value = mock_store
+        mock_factory.return_value = mock_store
         mock_emb = MagicMock()
         mock_get_emb.return_value = mock_emb
 
@@ -127,37 +126,34 @@ class TestGetSearchEngine:
         mock_store.load_index.assert_called_once()
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.path.exists", return_value=True)
-    def test_caches_across_calls(self, mock_exists, mock_vs_cls, mock_get_emb):
-        mock_vs_cls.return_value = MagicMock()
+    @patch("src.retrieval.search.create_default_store")
+    def test_caches_across_calls(self, mock_factory, mock_get_emb):
+        mock_factory.return_value = MagicMock()
         mock_get_emb.return_value = MagicMock()
 
         first = get_search_engine()
         second = get_search_engine()
         assert first[0] is second[0]
         assert first[1] is second[1]
-        # Constructor called only once
-        mock_vs_cls.assert_called_once()
+        # Factory called only once
+        mock_factory.assert_called_once()
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.makedirs")
-    def test_creates_data_dir_with_exist_ok(self, mock_makedirs, mock_vs_cls, mock_get_emb):
-        mock_vs_cls.return_value = MagicMock()
+    @patch("src.retrieval.search.create_default_store")
+    def test_factory_called_once(self, mock_factory, mock_get_emb):
+        mock_factory.return_value = MagicMock()
         mock_get_emb.return_value = MagicMock()
 
         get_search_engine()
-        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
+        mock_factory.assert_called_once()
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.makedirs")
-    def test_load_index_failure_does_not_poison_singleton(self, mock_makedirs, mock_vs_cls, mock_get_emb):
+    @patch("src.retrieval.search.create_default_store")
+    def test_load_index_failure_does_not_poison_singleton(self, mock_factory, mock_get_emb):
         """If load_index() raises, _vector_store must stay None for retry."""
         mock_store = MagicMock()
         mock_store.load_index.side_effect = OSError("corrupted index")
-        mock_vs_cls.return_value = mock_store
+        mock_factory.return_value = mock_store
         mock_get_emb.return_value = MagicMock()
 
         with pytest.raises(OSError, match="corrupted index"):
@@ -165,14 +161,13 @@ class TestGetSearchEngine:
         assert search_mod._vector_store is None
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.makedirs")
-    def test_retry_after_load_failure_succeeds(self, mock_makedirs, mock_vs_cls, mock_get_emb):
+    @patch("src.retrieval.search.create_default_store")
+    def test_retry_after_load_failure_succeeds(self, mock_factory, mock_get_emb):
         """After a failed load_index, a second call should re-attempt."""
         bad_store = MagicMock()
         bad_store.load_index.side_effect = RuntimeError("transient")
         good_store = MagicMock()
-        mock_vs_cls.side_effect = [bad_store, good_store]
+        mock_factory.side_effect = [bad_store, good_store]
         mock_get_emb.return_value = MagicMock()
 
         with pytest.raises(RuntimeError):
@@ -184,16 +179,15 @@ class TestGetSearchEngine:
         good_store.load_index.assert_called_once()
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.path.exists", return_value=True)
-    def test_passes_correct_paths(self, mock_exists, mock_vs_cls, mock_get_emb):
-        mock_vs_cls.return_value = MagicMock()
+    @patch("src.retrieval.search.create_default_store")
+    def test_factory_returns_configured_store(self, mock_factory, mock_get_emb):
+        mock_store = MagicMock()
+        mock_factory.return_value = mock_store
         mock_get_emb.return_value = MagicMock()
 
-        get_search_engine()
-        call_kwargs = mock_vs_cls.call_args[1]
-        assert call_kwargs["index_path"] == "data_store/faiss.index"
-        assert call_kwargs["metadata_path"] == "data_store/meta.json"
+        store, _ = get_search_engine()
+        assert store is mock_store
+        mock_store.load_index.assert_called_once()
 
 
 # ── perform_search ──────────────────────────────────────────────

@@ -196,14 +196,13 @@ class TestSearchEngineSingleton:
 
     @patch("src.retrieval.search._embedder", None)
     @patch("src.retrieval.search._vector_store", None)
-    @patch("src.retrieval.search.os.makedirs")
-    @patch("src.retrieval.search.VectorStore")
+    @patch("src.retrieval.search.create_default_store")
     @patch("src.retrieval.search.get_embedder")
-    def test_successful_init_caches(self, mock_emb, mock_vs_cls, _mkdirs):
+    def test_successful_init_caches(self, mock_emb, mock_factory):
         """Happy path: both singletons assigned after successful load."""
         from src.retrieval import search
         mock_store = MagicMock()
-        mock_vs_cls.return_value = mock_store
+        mock_factory.return_value = mock_store
         mock_emb.return_value = MagicMock()
 
         store, emb = search.get_search_engine()
@@ -216,14 +215,13 @@ class TestSearchEngineSingleton:
 
     @patch("src.retrieval.search._embedder", None)
     @patch("src.retrieval.search._vector_store", None)
-    @patch("src.retrieval.search.os.makedirs")
-    @patch("src.retrieval.search.VectorStore")
-    def test_failed_load_does_not_poison_singleton(self, mock_vs_cls, _mkdirs):
+    @patch("src.retrieval.search.create_default_store")
+    def test_failed_load_does_not_poison_singleton(self, mock_factory):
         """If load_index() raises, _vector_store must stay None for retry."""
         from src.retrieval import search
         mock_store = MagicMock()
         mock_store.load_index.side_effect = RuntimeError("corrupted")
-        mock_vs_cls.return_value = mock_store
+        mock_factory.return_value = mock_store
 
         with pytest.raises(RuntimeError, match="corrupted"):
             search.get_search_engine()

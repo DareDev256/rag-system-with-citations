@@ -50,6 +50,14 @@ def calculate_citation_coverage(answer: str, citations: List[Dict]) -> float:
     return used_count / valid_count
 
 
+def _tokenize(text: str) -> set:
+    """Extract content words (lowercase alphanumeric), excluding stop words.
+
+    Module-level for reuse across metrics and independent testability.
+    """
+    return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _STOP_WORDS}
+
+
 def estimate_hallucination_rate(answer: str, context_str: str) -> float:
     """Estimate hallucination via word-overlap heuristic.
 
@@ -59,9 +67,6 @@ def estimate_hallucination_rate(answer: str, context_str: str) -> float:
     """
     if not answer or not answer.strip():
         return 0.0
-
-    def _tokenize(text: str) -> set:
-        return {w for w in re.findall(r"[a-z0-9]+", text.lower()) if w not in _STOP_WORDS}
 
     answer_words = _tokenize(answer)
     if not answer_words:

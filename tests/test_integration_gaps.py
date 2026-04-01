@@ -47,11 +47,10 @@ class TestLifespan:
 
 
 class TestIngest:
-    @patch("src.data.ingest.VectorStore")
+    @patch("src.data.ingest.create_default_store")
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
-    @patch("src.data.ingest.os.makedirs")
-    def test_full_pipeline(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_full_pipeline(self, mock_load, mock_embed, mock_factory):
         from src.data.ingest import ingest
 
         mock_load.return_value = [
@@ -62,45 +61,41 @@ class TestIngest:
         mock_embed.return_value = mock_embedder
 
         mock_vs = MagicMock()
-        mock_vs_cls.return_value = mock_vs
+        mock_factory.return_value = mock_vs
 
         ingest()
 
-        mock_makedirs.assert_called_once()
+        mock_factory.assert_called_once()
         mock_embedder.encode.assert_called_once_with(["hello world"])
         mock_vs.create_index.assert_called_once_with(dimension=3)
         mock_vs.add_documents.assert_called_once()
         mock_vs.save_index.assert_called_once()
 
     @patch("src.data.ingest.load_documents", return_value=[])
-    @patch("src.data.ingest.os.makedirs")
-    def test_no_documents_exits_early(self, mock_makedirs, mock_load):
+    def test_no_documents_exits_early(self, mock_load):
         from src.data.ingest import ingest
 
         ingest()  # should not raise
-        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
 
-    @patch("src.data.ingest.VectorStore")
+    @patch("src.data.ingest.create_default_store")
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
-    @patch("src.data.ingest.os.makedirs")
-    def test_creates_index_dir_atomically(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_creates_index_dir_atomically(self, mock_load, mock_embed, mock_factory):
         from src.data.ingest import ingest
 
         mock_load.return_value = [{"doc_id": "a_0", "text": "content", "source": "a.txt"}]
         mock_embedder = MagicMock()
         mock_embedder.encode.return_value = [[0.5]]
         mock_embed.return_value = mock_embedder
-        mock_vs_cls.return_value = MagicMock()
+        mock_factory.return_value = MagicMock()
 
         ingest()
-        mock_makedirs.assert_called_once_with("data_store", exist_ok=True)
+        mock_factory.assert_called_once()
 
-    @patch("src.data.ingest.VectorStore")
+    @patch("src.data.ingest.create_default_store")
     @patch("src.data.ingest.get_embedder")
     @patch("src.data.ingest.load_documents")
-    @patch("src.data.ingest.os.makedirs")
-    def test_multiple_documents(self, mock_makedirs, mock_load, mock_embed, mock_vs_cls):
+    def test_multiple_documents(self, mock_load, mock_embed, mock_factory):
         from src.data.ingest import ingest
 
         mock_load.return_value = [
@@ -111,7 +106,7 @@ class TestIngest:
         mock_embedder.encode.return_value = [[0.1, 0.2], [0.3, 0.4]]
         mock_embed.return_value = mock_embedder
         mock_vs = MagicMock()
-        mock_vs_cls.return_value = mock_vs
+        mock_factory.return_value = mock_vs
 
         ingest()
 
@@ -311,13 +306,12 @@ class TestSearchEngineRaceSafety:
         mod._embedder = None
 
     @patch("src.retrieval.search.get_embedder")
-    @patch("src.retrieval.search.VectorStore")
-    @patch("src.retrieval.search.os.makedirs")
-    def test_concurrent_threads_create_single_engine(self, mock_makedirs, mock_vs_cls, mock_embed):
+    @patch("src.retrieval.search.create_default_store")
+    def test_concurrent_threads_create_single_engine(self, mock_factory, mock_embed):
         from src.retrieval.search import get_search_engine
 
         mock_vs = MagicMock()
-        mock_vs_cls.return_value = mock_vs
+        mock_factory.return_value = mock_vs
         mock_embedder = MagicMock()
         mock_embed.return_value = mock_embedder
 
@@ -339,4 +333,4 @@ class TestSearchEngineRaceSafety:
         embedders = [r[1] for r in results]
         assert len(set(id(s) for s in stores)) == 1
         assert len(set(id(e) for e in embedders)) == 1
-        mock_vs_cls.assert_called_once()
+        mock_factory.assert_called_once()

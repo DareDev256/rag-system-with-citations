@@ -6,8 +6,7 @@ load, preventing poisoned state from propagating on transient failures.
 """
 
 from src.retrieval.embed import get_embedder
-from src.retrieval.vector_store import VectorStore
-import os
+from src.retrieval.vector_store import create_default_store
 import threading
 
 _vector_store = None
@@ -27,14 +26,7 @@ def get_search_engine():
         return _vector_store, _embedder
     with _search_engine_lock:
         if _vector_store is None:
-            # Default paths — exist_ok avoids TOCTOU race between exists() and makedirs()
-            base_path = "data_store"
-            os.makedirs(base_path, exist_ok=True)
-
-            index_path = os.path.join(base_path, "faiss.index")
-            meta_path = os.path.join(base_path, "meta.json")
-
-            store = VectorStore(index_path=index_path, metadata_path=meta_path)
+            store = create_default_store()
             store.load_index()
             # Only assign singleton AFTER successful load — prevents poisoning on failure
             _vector_store = store
