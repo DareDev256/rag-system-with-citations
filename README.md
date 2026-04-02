@@ -3,9 +3,9 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.20.2-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-453_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-20-e05d44?style=flat-square&logo=shield)
+![Version](https://img.shields.io/badge/version-1.20.3-blue?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-482_passing-2ea44f?style=flat-square)
+![Security](https://img.shields.io/badge/defense_layers-21-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
 
@@ -22,7 +22,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **Citation-enforced answers** — LLM must reference `[doc_id]` from retrieved context or confidence drops to 0.3
 - **Real confidence scoring** — calculated from citation coverage ratio, not model self-assessment
 - **Hallucination detection** — flags citations that reference documents not in the retrieval set, plus a word-overlap `hallucination_rate` and composite `answer_quality_score` (0–1) in diagnostics
-- **20-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning
+- **21-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning, indirect prompt injection defense (snippet truncation + injection pattern neutralization + XML delimiter isolation)
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
 - **435 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes

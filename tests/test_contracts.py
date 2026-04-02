@@ -50,7 +50,7 @@ class TestPromptSafetyContract:
 
     def test_empty_context_and_query(self):
         result = format_rag_prompt("", "")
-        assert "Context:" in result
+        assert "<retrieved_documents>" in result
         assert "User Question:" in result
 
 

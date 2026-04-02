@@ -162,7 +162,7 @@ class TestPromptInjection:
     def test_rag_prompt_preserves_all_template_structure(self):
         """Verify the prompt still has the expected structure after replacement."""
         result = format_rag_prompt("my context", "my question")
-        assert "Context:" in result
+        assert "<retrieved_documents>" in result
         assert "my context" in result
         assert "User Question: my question" in result
         assert "Answer (include citations" in result
@@ -188,7 +188,7 @@ class TestPromptInjection:
         """Neither context nor query should be able to inject into the other's slot."""
         result = format_rag_prompt("{query}", "{context_str}")
         # Context slot contains literal {query}
-        assert "Context:\n{query}" in result
+        assert "<retrieved_documents>\n{query}\n</retrieved_documents>" in result
         # Query slot contains literal {context_str}
         assert "User Question: {context_str}" in result
 

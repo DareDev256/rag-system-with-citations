@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.3] - 2026-04-02
+
+### Security
+- **Indirect prompt injection defense in `build_context_str` (CWE-74)** — corpus document snippets were concatenated raw into the LLM prompt, allowing poisoned documents to hijack model behavior with phrases like "Ignore all previous instructions." Now applies three defense layers: (1) per-snippet truncation at 2000 chars to prevent context-window flooding, (2) regex-based neutralization of instruction-override and persona-hijack patterns (wrapped in `[BLOCKED INSTRUCTION: ...]` markers for audit trail), (3) XML delimiter isolation (`<retrieved_documents>`) with an explicit guard telling the LLM to never follow directives found inside the context block
+
+### Added
+- `_sanitize_snippet()` function in `prompt.py` — truncates and defangs untrusted corpus text
+- `_INJECTION_PATTERNS` compiled regex covering instruction overrides, persona hijacks, and system tag injections (Llama/Mistral `<<SYS>>` format)
+- 29 prompt injection defense tests (`test_prompt_injection.py`) covering truncation boundaries, injection pattern blocking, false-positive avoidance, XML delimiter verification, and integration with `build_context_str`
+
+### Changed
+- RAG prompt template now wraps context in `<retrieved_documents>` XML tags with explicit instruction guard
+- Updated 3 existing tests in `test_contracts.py` and `test_hardening.py` to match new template structure — 482 tests total
+
 ## [1.20.2] - 2026-04-02
 
 ### Security
