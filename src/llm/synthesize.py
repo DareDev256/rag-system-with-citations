@@ -85,7 +85,7 @@ def get_available_doc_ids(search_results: List[Dict]) -> Set[str]:
     hallucination detection all need this same set.  Filters out None/empty
     doc_ids so downstream comparisons don't false-match on broken metadata.
     """
-    return {res["doc_id"] for res in search_results if res.get("doc_id")}
+    return {res["doc_id"] for res in search_results if res.get("doc_id") is not None}
 
 
 def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None) -> Set[str]:

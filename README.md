@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
 ![Version](https://img.shields.io/badge/version-1.20.1-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-435_passing-2ea44f?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-442_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-20-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.

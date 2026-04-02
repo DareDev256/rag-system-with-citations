@@ -126,6 +126,52 @@ class TestBuildContextStrEdgeCases:
     def test_snippet_with_newlines(self):
         assert "line1\nline2" in build_context_str([{"doc_id": "d1", "snippet": "line1\nline2"}])
 
+    def test_integer_doc_id_zero_preserved(self):
+        """Integer doc_id 0 is valid — must not be dropped by falsy check."""
+        assert build_context_str([{"doc_id": 0, "snippet": "zero doc"}]) == "[0] zero doc"
+
+    def test_integer_doc_id_nonzero_preserved(self):
+        """Integer doc_ids like 42 should render correctly."""
+        assert build_context_str([{"doc_id": 42, "snippet": "data"}]) == "[42] data"
+
+    def test_mixed_string_and_integer_doc_ids(self):
+        """Pipeline handles mixed doc_id types without dropping any."""
+        results = [
+            {"doc_id": 0, "snippet": "first"},
+            {"doc_id": "d1", "snippet": "second"},
+            {"doc_id": 99, "snippet": "third"},
+        ]
+        output = build_context_str(results)
+        assert "[0] first" in output
+        assert "[d1] second" in output
+        assert "[99] third" in output
+
+
+# ── get_available_doc_ids: falsy doc_id regression ───────────────
+
+class TestGetAvailableDocIdsFalsyRegression:
+    """Verify get_available_doc_ids uses ``is not None`` — not falsy check."""
+
+    def test_zero_doc_id_included(self):
+        from src.llm.synthesize import get_available_doc_ids
+        results = [{"doc_id": 0, "snippet": "x"}]
+        assert get_available_doc_ids(results) == {0}
+
+    def test_empty_string_doc_id_included(self):
+        from src.llm.synthesize import get_available_doc_ids
+        results = [{"doc_id": "", "snippet": "x"}]
+        assert get_available_doc_ids(results) == {""}
+
+    def test_none_doc_id_excluded(self):
+        from src.llm.synthesize import get_available_doc_ids
+        results = [{"doc_id": None, "snippet": "x"}]
+        assert get_available_doc_ids(results) == set()
+
+    def test_missing_doc_id_excluded(self):
+        from src.llm.synthesize import get_available_doc_ids
+        results = [{"snippet": "x"}]
+        assert get_available_doc_ids(results) == set()
+
 
 # ── calculate_citation_coverage: edge cases ──────────────────────
 

@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.1] - 2026-04-02
+
+### Fixed
+- **Falsy doc_id check drops valid integer `0` in `build_context_str` and `get_available_doc_ids`** — both functions used truthiness checks (`if not doc_id` / `if res.get("doc_id")`) which silently excluded valid integer doc_ids like `0`. Now uses explicit `is None` / `is not None` checks, consistent with `_sanitize_field` and `calculate_citation_coverage` which were already fixed. This caused context-string omission and confidence miscalculation for documents with falsy-but-valid IDs
+
+### Added
+- 7 regression tests: integer `0` / nonzero / mixed-type doc_ids in `build_context_str`, plus `get_available_doc_ids` coverage for `0`, empty string, `None`, and missing key — 442 tests total
+
 ## [1.20.0] - 2026-04-01
 
 ### Changed

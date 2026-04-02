@@ -47,7 +47,11 @@ def build_context_str(results: List[Dict]) -> str:
         snippet = res.get("snippet")
         # Skip results with missing identity — they pollute the LLM context
         # with "[None] None" and can cause false citation matches downstream.
-        if not doc_id or not snippet:
+        # Use ``is None`` for doc_id (not falsy check) so valid values like
+        # integer 0 are preserved — consistent with _sanitize_field and
+        # calculate_citation_coverage.  Snippet uses ``not`` because empty
+        # string snippets waste context with "[d1] " blank entries.
+        if doc_id is None or not snippet:
             continue
         context_parts.append(f"[{doc_id}] {snippet}")
     return "\n\n".join(context_parts)
