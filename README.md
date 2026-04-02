@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.20.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.20.1-blue?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-435_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-20-e05d44?style=flat-square&logo=shield)
 
