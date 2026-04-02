@@ -283,6 +283,69 @@ class TestClientKwargs:
             assert "base_url" not in kwargs
 
 
+# ── SSRF Prevention on OPENAI_BASE_URL (CWE-918) ─────────────
+
+
+class TestBaseUrlSsrfPrevention:
+    """_validate_base_url must block non-HTTP schemes and cloud metadata endpoints."""
+
+    def test_https_allowed(self):
+        from src.llm.synthesize import _validate_base_url
+        assert _validate_base_url("https://api.openai.com/v1") == "https://api.openai.com/v1"
+
+    def test_http_allowed(self):
+        from src.llm.synthesize import _validate_base_url
+        assert _validate_base_url("http://localhost:4000/v1") == "http://localhost:4000/v1"
+
+    def test_file_scheme_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="scheme must be http or https"):
+            _validate_base_url("file:///etc/passwd")
+
+    def test_ftp_scheme_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="scheme must be http or https"):
+            _validate_base_url("ftp://evil.com/payload")
+
+    def test_gopher_scheme_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="scheme must be http or https"):
+            _validate_base_url("gopher://internal:70/")
+
+    def test_no_scheme_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError):
+            _validate_base_url("just-a-hostname")
+
+    def test_aws_metadata_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="blocked metadata endpoint"):
+            _validate_base_url("http://169.254.169.254/latest/meta-data/")
+
+    def test_gcp_metadata_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="blocked metadata endpoint"):
+            _validate_base_url("http://metadata.google.internal/computeMetadata/v1/")
+
+    def test_alibaba_metadata_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="blocked metadata endpoint"):
+            _validate_base_url("http://100.100.100.200/latest/meta-data/")
+
+    def test_empty_hostname_blocked(self):
+        from src.llm.synthesize import _validate_base_url
+        with pytest.raises(ValueError, match="no hostname"):
+            _validate_base_url("http://")
+
+    def test_client_kwargs_validates_base_url(self):
+        """_client_kwargs integrates SSRF validation — bad URLs raise before client creation."""
+        from src.llm.synthesize import _client_kwargs
+        env = {"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": "file:///etc/shadow"}
+        with patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: env.get(k)):
+            with pytest.raises(ValueError, match="scheme must be http or https"):
+                _client_kwargs()
+
+
 # ── LLM Timeout Configuration ───────────────────────────────────
 
 

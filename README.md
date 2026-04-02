@@ -4,7 +4,7 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
 ![Version](https://img.shields.io/badge/version-1.20.2-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-464_passing-2ea44f?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-453_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-20-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
@@ -204,7 +204,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-435 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+453 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -212,7 +212,7 @@ pytest tests/ -v
 
 | Suite | Tests | Scope |
 |-------|------:|-------|
-| `test_hardening.py` | 81 | Security headers, prompt injection, rate limiting, error sanitization |
+| `test_hardening.py` | 92 | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
 | `test_core.py` | 52 | Citation extraction, confidence scoring, schema validation, metrics |
 | `test_edge_cases.py` | 49 | Unicode, boundary values, type coercion, hallucination edge cases |
 | `test_response_builders.py` | 42 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |

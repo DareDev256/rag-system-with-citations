@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.2] - 2026-04-02
+
+### Security
+- **SSRF prevention on `OPENAI_BASE_URL` (CWE-918)** — `_client_kwargs()` in `synthesize.py` previously passed the proxy URL to the OpenAI client without any validation. A poisoned env var could redirect LLM API calls to `file:///`, `ftp://`, cloud metadata endpoints (169.254.169.254, metadata.google.internal), or other internal services. Now validates scheme (http/https only), blocks known cloud metadata hosts, and rejects empty hostnames. Mirrors the SSRF protection already in place for `EMBEDDING_MODEL`
+
+### Added
+- `_validate_base_url()` function with scheme allowlist and cloud metadata blocklist
+- 11 SSRF prevention tests covering allowed schemes, blocked schemes (file/ftp/gopher), cloud metadata endpoints (AWS/GCP/Alibaba), empty hostname, and integration with `_client_kwargs`
+
 ## [1.20.1] - 2026-04-02
 
 ### Fixed

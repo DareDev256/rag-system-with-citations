@@ -4,6 +4,7 @@ import logging
 import os
 import re
 import threading
+from urllib.parse import urlparse
 import openai
 from typing import List, Dict, Any, Optional, Set
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
@@ -28,12 +29,47 @@ _sync_client_lock = threading.Lock()
 _async_client_lock = None  # Lazy init — asyncio.Lock() requires a running event loop
 
 
+# ─── SSRF Prevention (CWE-918) ──────────────────────────────────────
+_ALLOWED_SCHEMES = {"https", "http"}
+_BLOCKED_HOSTS = frozenset({
+    "169.254.169.254",       # AWS/GCP metadata
+    "metadata.google.internal",  # GCP metadata
+    "100.100.100.200",       # Alibaba Cloud metadata
+})
+
+
+def _validate_base_url(url: str) -> str:
+    """Validate OPENAI_BASE_URL to prevent SSRF attacks.
+
+    Only allows http:// and https:// schemes; blocks known cloud metadata
+    endpoints and rejects file://, ftp://, gopher://, etc.
+
+    Raises:
+        ValueError: If the URL uses a disallowed scheme or targets a blocked host.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in _ALLOWED_SCHEMES:
+        raise ValueError(
+            f"OPENAI_BASE_URL scheme must be http or https, got '{parsed.scheme}'"
+        )
+    hostname = parsed.hostname or ""
+    if hostname in _BLOCKED_HOSTS:
+        raise ValueError(
+            f"OPENAI_BASE_URL targets a blocked metadata endpoint: {hostname}"
+        )
+    if not hostname:
+        raise ValueError("OPENAI_BASE_URL has no hostname")
+    return url
+
+
 def _client_kwargs() -> dict:
     """Build shared kwargs for OpenAI client initialization.
 
     Supports OPENAI_BASE_URL for proxy compatibility — any OpenAI-compatible
     proxy (LiteLLM, OpenRouter, enterprise gateways) works by setting this
-    env var alongside OPENAI_API_KEY.
+    env var alongside OPENAI_API_KEY. The URL is validated against an
+    allowlist of schemes and a blocklist of cloud metadata endpoints to
+    prevent SSRF (CWE-918).
     """
     kwargs = {}
     api_key = os.getenv("OPENAI_API_KEY")
@@ -43,7 +79,7 @@ def _client_kwargs() -> dict:
 
     base_url = os.getenv("OPENAI_BASE_URL")
     if base_url:
-        kwargs["base_url"] = base_url
+        kwargs["base_url"] = _validate_base_url(base_url)
 
     return kwargs
 
