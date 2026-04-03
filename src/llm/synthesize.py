@@ -121,7 +121,7 @@ def get_available_doc_ids(search_results: List[Dict]) -> Set[str]:
     hallucination detection all need this same set.  Filters out None/empty
     doc_ids so downstream comparisons don't false-match on broken metadata.
     """
-    return {res["doc_id"] for res in search_results if res.get("doc_id") is not None}
+    return {str(res["doc_id"]) for res in search_results if res.get("doc_id") is not None}
 
 
 def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None) -> Set[str]:
@@ -262,7 +262,10 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
 
     analysis = analyze_citations(answer, search_results)
 
-    citations_used = [res for res in search_results if res.get("doc_id") in analysis.valid_cited_ids]
+    citations_used = [
+        res for res in search_results
+        if res.get("doc_id") is not None and str(res["doc_id"]) in analysis.valid_cited_ids
+    ]
 
     # Fallback: include top result when LLM doesn't follow citation format
     if not citations_used and search_results:

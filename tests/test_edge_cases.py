@@ -155,7 +155,7 @@ class TestGetAvailableDocIdsFalsyRegression:
     def test_zero_doc_id_included(self):
         from src.llm.synthesize import get_available_doc_ids
         results = [{"doc_id": 0, "snippet": "x"}]
-        assert get_available_doc_ids(results) == {0}
+        assert get_available_doc_ids(results) == {"0"}  # coerced to str for set-intersection safety
 
     def test_empty_string_doc_id_included(self):
         from src.llm.synthesize import get_available_doc_ids
@@ -200,6 +200,50 @@ class TestCitationCoverageEdgeCases:
     def test_doc_id_without_brackets_still_matches(self):
         """Coverage checks both [doc_id] and bare doc_id."""
         assert calculate_citation_coverage("The doc_001 says so.", [{"doc_id": "doc_001"}]) == 1.0
+
+    def test_integer_doc_id_no_crash(self):
+        """Integer doc_id must not raise TypeError on ``int in str``."""
+        assert calculate_citation_coverage("See [42] here.", [{"doc_id": 42}]) == 1.0
+
+    def test_integer_zero_doc_id_matched(self):
+        """Integer 0 doc_id coerced to '0' — matches [0] in answer."""
+        assert calculate_citation_coverage("See [0] here.", [{"doc_id": 0}]) == 1.0
+
+    def test_integer_doc_id_bare_match(self):
+        """Integer doc_id matched via bare string check (no brackets)."""
+        assert calculate_citation_coverage("Document 7 says yes.", [{"doc_id": 7}]) == 1.0
+
+
+# ── analyze_citations: integer doc_id cross-function regression ──
+
+class TestAnalyzeCitationsIntegerDocIds:
+    """Regression: integer doc_ids caused silent set-intersection failure.
+
+    get_available_doc_ids returned {0} (int), extract_cited_doc_ids returned
+    {"0"} (str) — intersection was empty even for valid citations.
+    """
+
+    def test_integer_doc_id_detected_as_cited(self):
+        from src.llm.synthesize import analyze_citations
+        results = [{"doc_id": 0, "snippet": "data"}, {"doc_id": 1, "snippet": "more"}]
+        analysis = analyze_citations("Answer from [0] and [1].", results)
+        assert "0" in analysis.valid_cited_ids
+        assert "1" in analysis.valid_cited_ids
+        assert len(analysis.hallucinated_ids) == 0
+        assert analysis.coverage == 1.0
+
+    def test_mixed_int_and_string_doc_ids(self):
+        from src.llm.synthesize import analyze_citations
+        results = [{"doc_id": 0, "snippet": "x"}, {"doc_id": "d1", "snippet": "y"}]
+        analysis = analyze_citations("See [0] and [d1].", results)
+        assert analysis.valid_cited_ids == frozenset({"0", "d1"})
+        assert analysis.coverage == 1.0
+
+    def test_integer_doc_id_confidence_not_degraded(self):
+        from src.llm.synthesize import calculate_confidence
+        results = [{"doc_id": 0, "snippet": "x"}]
+        conf = calculate_confidence("Answer [0].", results, {"0"})
+        assert conf == 1.0  # not 0.3 from type-mismatch
 
 
 # ── measure_latency: edge cases ──────────────────────────────────

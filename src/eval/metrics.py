@@ -41,8 +41,11 @@ def calculate_citation_coverage(answer: str, citations: List[Dict]) -> float:
         if doc_id is None:
             continue
         valid_count += 1
-        # Check for [doc_id] or just the id if prompt format varies
-        if f"[{doc_id}]" in answer or doc_id in answer:
+        # Coerce to str — JSON metadata can produce int doc_ids, but
+        # the answer text is always a string, so ``int in str`` would
+        # raise TypeError without this conversion.
+        doc_id_str = str(doc_id)
+        if f"[{doc_id_str}]" in answer or doc_id_str in answer:
             used_count += 1
 
     if valid_count == 0:

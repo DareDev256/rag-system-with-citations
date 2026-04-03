@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.4] - 2026-04-03
+
+### Fixed
+- **Integer doc_id type mismatch causes silent citation failure and TypeError crash** — `get_available_doc_ids` preserved raw types from JSON metadata (e.g. integer `0`), but `extract_cited_doc_ids` returns strings from regex. Set intersection `{"0"} & {0}` silently returned empty, causing valid citations to be ignored (confidence degraded to 0.3, citations_used emptied). Additionally, `calculate_citation_coverage` performed `int in str` which raises `TypeError`. Now coerces all doc_ids to `str` at the type boundary: `get_available_doc_ids`, `calculate_citation_coverage`, and `_parse_synthesis` citation filtering
+
+### Added
+- 6 regression tests: integer doc_id in `calculate_citation_coverage` (crash, zero, bare match), `analyze_citations` cross-function type boundary (int-only, mixed int/str, confidence preservation) — 488 tests total
+
 ## [1.20.3] - 2026-04-02
 
 ### Security
