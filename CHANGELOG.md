@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.5] - 2026-04-03
+
+### Changed
+- **Extracted `_prepare_vectors` and `_validate_dimension` helpers in `VectorStore`** — deduplicated the numpy array conversion → float32 cast → L2 normalization pipeline and the dimension mismatch check that were repeated across `add_documents` and `search`. Both methods now delegate to private helpers, making the normalization strategy a single decision point
+- Removed stale 6-line comment block in `create_index` that debated index type selection (decision was already made) — 488 tests passing
+
 ## [1.20.4] - 2026-04-03
 
 ### Fixed

@@ -71,6 +71,26 @@ class VectorStore:
         self.index = None
         self.metadata = []  # List of dicts corresponding to index IDs
 
+    # ── Private helpers ───────────────────────────────────────────
+    def _prepare_vectors(self, vectors: List[List[float]]) -> "np.ndarray":
+        """Convert raw embeddings to a normalized float32 numpy array.
+
+        Centralizes the numpy conversion → float32 cast → L2 normalization
+        pipeline that both add_documents and search need.
+        """
+        arr = np.array(vectors).astype("float32")
+        faiss.normalize_L2(arr)
+        return arr
+
+    def _validate_dimension(self, dim: int, label: str = "Vector") -> None:
+        """Raise ValueError if *dim* doesn't match the loaded index."""
+        if self.index is not None and self.index.d != dim:
+            raise ValueError(
+                f"{label} dimension {dim} does not match "
+                f"index dimension {self.index.d}"
+            )
+
+    # ── Public API ────────────────────────────────────────────────
     def load_index(self) -> None:
         """Load FAISS index and metadata from disk, or start with empty state."""
         if os.path.exists(self.index_path) and os.path.exists(self.metadata_path):
@@ -89,12 +109,6 @@ class VectorStore:
         Uses inner product (IP) on L2-normalized vectors, which is equivalent
         to cosine similarity. Vectors must be normalized before add().
         """
-        # L2 Distance (Euclidean). For inner product (cosine), use faiss.IndexFlatIP
-        # and normalize vectors beforehand. We'll stick to L2 for simplicity or 
-        # assume normalized if we want cosine similarity.
-        # Sentence-transformers usually work well with Cosine Similarity.
-        # Let's use Inner Product (IP) and ensuring normalization in embedder or ingest.
-        
         self.index = faiss.IndexFlatIP(dimension)
         self.metadata = []
 
@@ -109,20 +123,14 @@ class VectorStore:
         """
         if not embeddings:
             return
-        
+
         dim = len(embeddings[0])
         if self.index is None:
             self.create_index(dim)
-        elif self.index.d != dim:
-            raise ValueError(
-                f"Embedding dimension {dim} does not match index dimension {self.index.d}"
-            )
+        else:
+            self._validate_dimension(dim, label="Embedding")
 
-        vectors = np.array(embeddings).astype('float32')
-        # Normalize for Cosine Similarity (IndexFlatIP)
-        faiss.normalize_L2(vectors)
-        
-        self.index.add(vectors)
+        self.index.add(self._prepare_vectors(embeddings))
         self.metadata.extend(docs_metadata)
         
     def save_index(self) -> None:
@@ -150,14 +158,9 @@ class VectorStore:
         if not self.index:
             return []
 
-        if len(query_vector) != self.index.d:
-            raise ValueError(
-                f"Query dimension {len(query_vector)} does not match index dimension {self.index.d}"
-            )
+        self._validate_dimension(len(query_vector), label="Query")
 
-        vector = np.array([query_vector]).astype('float32')
-        faiss.normalize_L2(vector)
-        
+        vector = self._prepare_vectors([query_vector])
         distances, indices = self.index.search(vector, k)
         
         results = []
