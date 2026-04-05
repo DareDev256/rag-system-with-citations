@@ -3,8 +3,8 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.20.5-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-501_passing-2ea44f?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.20.6-blue?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-488_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-22-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
@@ -25,7 +25,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **22-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning, indirect prompt injection defense (snippet truncation + injection pattern neutralization + XML delimiter isolation), **metadata schema validation** (CWE-20 — type/length/format enforcement on ingest + storage load)
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **501 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **488 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -173,7 +173,7 @@ Real metric, not model self-assessment:
 
 ## Security
 
-16-layer defense-in-depth. Each layer maps to a specific CWE threat class:
+22-layer defense-in-depth. Each layer maps to a specific CWE threat class:
 
 | Layer | Defense | CWE |
 |-------|---------|-----|
@@ -193,18 +193,24 @@ Real metric, not model self-assessment:
 | 14 | Non-root Docker container | CWE-250 |
 | 15 | Webhook HMAC-SHA256 signature verification | CWE-345 |
 | 16 | SSRF prevention on proxy URL (scheme validation) | CWE-918 |
+| 17 | Indirect prompt injection — snippet truncation | CWE-74 |
+| 18 | Indirect prompt injection — pattern neutralization | CWE-74 |
+| 19 | Indirect prompt injection — XML delimiter isolation | CWE-74 |
+| 20 | Auth failure logging (brute-force visibility) | CWE-778 |
+| 21 | Metadata schema validation (type/length/format) | CWE-20 |
+| 22 | Pinned dependencies (no floating versions) | CWE-829 |
 
 Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ### Deep Dives
 
-- **[Security Architecture](docs/security.md)** — full threat model, 16-layer CWE mapping, configuration reference, known gaps
+- **[Security Architecture](docs/security.md)** — full threat model, 22-layer CWE mapping, configuration reference, known gaps
 - **[Proxy Integration](docs/proxy-integration.md)** — LiteLLM, OpenRouter, Ollama, vLLM setup guides
 - **[SocialBu MCP Integration](docs/socialbu-mcp-integration.md)** — connect AI agents to SocialBu for automated social media posting via MCP + OpenAPI proxy
 
 ## Testing
 
-453 tests across 17 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+488 tests across 18 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -213,9 +219,11 @@ pytest tests/ -v
 | Suite | Tests | Scope |
 |-------|------:|-------|
 | `test_hardening.py` | 92 | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
+| `test_edge_cases.py` | 62 | Unicode, boundary values, type coercion, hallucination edge cases |
 | `test_core.py` | 52 | Citation extraction, confidence scoring, schema validation, metrics |
-| `test_edge_cases.py` | 49 | Unicode, boundary values, type coercion, hallucination edge cases |
-| `test_response_builders.py` | 42 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |
+| `test_response_builders.py` | 40 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |
+| `test_contracts.py` | 35 | Behavioral interface tests — prompt safety, client factories, citation patterns |
+| `test_prompt_injection.py` | 29 | Indirect injection defense — truncation, pattern blocking, false-positive avoidance, XML delimiters |
 | `test_search.py` | 19 | Embedder singleton, search orchestration, model failure recovery |
 | `test_integration_gaps.py` | 18 | Lifespan, ingest pipeline, client factories, race conditions |
 | `test_ip_resolution.py` | 18 | Proxy extraction, spoofing resistance, IPv6, fallback |
@@ -224,7 +232,6 @@ pytest tests/ -v
 | `test_resilience.py` | 16 | File I/O failures, corrupted state, singleton poisoning |
 | `test_llm.py` | 14 | Sync LLM mocks — classification, synthesis, error handling |
 | `test_llm_async.py` | 14 | Async LLM mocks — parity with sync implementations |
-| `test_contracts.py` | 35 | Behavioral interface tests — prompt safety, client factories, citation patterns |
 | `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
 | `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
 | `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
@@ -299,7 +306,7 @@ src/
     ├── ip.py            # Trusted proxy IP resolution
     └── timing.py        # Latency decorator + TimingContext context manager
 ```
-16-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
+22-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, indirect prompt injection defense, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
 
 ## Docker
 
