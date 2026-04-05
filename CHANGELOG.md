@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.6] - 2026-04-05
+
+### Changed
+- **Extracted prompt constants and centralized synthesis prompt builder** — system prompts for classification (`CLASSIFIER_SYSTEM_PROMPT`) and synthesis (`SYNTHESIS_SYSTEM_PROMPT`) are now module-level constants in `synthesize.py`, making them visible in diffs and reviewable without tracing through helper functions. Added `_build_synthesis_prompt()` helper to eliminate the duplicated `format_rag_prompt(build_context_str(...), query)` chain in sync and async entry points
+- Version bump in `main.py` to match README badge (was behind at 1.20.3)
+
 ## [1.20.5] - 2026-04-03
 
 ### Changed

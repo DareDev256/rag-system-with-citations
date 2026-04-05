@@ -290,7 +290,7 @@ src/
 │   └── schemas.py       # Pydantic request/response models
 ├── llm/
 │   ├── prompt.py        # RAG + classification prompt templates
-│   └── synthesize.py    # LLM calls (sync + async), safe-call helpers, CitationAnalysis, confidence scoring
+│   └── synthesize.py    # LLM calls (sync + async), prompt constants, safe-call helpers, CitationAnalysis, confidence scoring
 ├── retrieval/
 │   ├── embed.py         # Sentence Transformers embedder (singleton)
 │   ├── search.py        # Search orchestration layer

@@ -112,6 +112,17 @@ async def get_async_llm_client():
 
 CITATION_PATTERN = re.compile(r'\[([^\]]+)\]')
 
+# ─── Prompt Constants ──────────────────────────────────────────────────
+# Surfaced as module-level constants so prompt engineering changes are
+# visible in diffs and reviewable without reading through helper functions.
+
+CLASSIFIER_SYSTEM_PROMPT = "You are a precise classifier."
+
+SYNTHESIS_SYSTEM_PROMPT = (
+    "You are a grounded QA assistant. "
+    "Always cite your sources using [doc_id] format."
+)
+
 
 def get_available_doc_ids(search_results: List[Dict]) -> Set[str]:
     """Extract the set of valid (non-None) doc_ids from search results.
@@ -238,14 +249,23 @@ _VALID_CATEGORIES = {"factual", "exploratory", "ambiguous"}
 
 def _classification_messages(query: str) -> List[Dict[str, str]]:
     return [
-        {"role": "system", "content": "You are a precise classifier."},
+        {"role": "system", "content": CLASSIFIER_SYSTEM_PROMPT},
         {"role": "user", "content": format_classification_prompt(query)},
     ]
 
 
+def _build_synthesis_prompt(query: str, search_results: List[Dict]) -> str:
+    """Build the full RAG prompt from query and search results.
+
+    Centralizes the context-building → prompt-formatting pipeline that
+    was previously duplicated in both sync and async entry points.
+    """
+    return format_rag_prompt(build_context_str(search_results), query)
+
+
 def _synthesis_messages(prompt: str) -> List[Dict[str, str]]:
     return [
-        {"role": "system", "content": "You are a grounded QA assistant. Always cite your sources using [doc_id] format."},
+        {"role": "system", "content": SYNTHESIS_SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
     ]
 
@@ -342,7 +362,7 @@ def classify_query(query: str) -> str:
 
 @measure_latency
 def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
-    prompt = format_rag_prompt(build_context_str(search_results), query)
+    prompt = _build_synthesis_prompt(query, search_results)
     return _safe_llm_call(
         SYNTHESIS_MODEL, _synthesis_messages(prompt),
         lambda r: _parse_synthesis(r, search_results), dict(_SYNTHESIS_ERROR),
@@ -363,7 +383,7 @@ async def classify_query_async(query: str) -> str:
 
 async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     """Async version of synthesize_answer for non-blocking API calls."""
-    prompt = format_rag_prompt(build_context_str(search_results), query)
+    prompt = _build_synthesis_prompt(query, search_results)
     return await _safe_llm_call_async(
         SYNTHESIS_MODEL, _synthesis_messages(prompt),
         lambda r: _parse_synthesis(r, search_results), dict(_SYNTHESIS_ERROR),
