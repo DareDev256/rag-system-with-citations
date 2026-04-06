@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.8] - 2026-04-06
+
+### Added
+- **22 tests for recently refactored code paths** — direct unit tests for `analyze_citations()` (9 tests: coverage, hallucination partitioning, frozen immutability, integer/zero doc_id coercion), `_build_synthesis_prompt()` (4 tests: context wiring, None exclusion, format placeholder injection safety), `_parse_synthesis` CitationAnalysis threading (3 tests: presence, correctness, reusability by `build_diagnostics`), prompt constant stability (3 tests: message builder wiring, citation format instruction), `_validate_dimension` (3 tests: no-index no-op, match, mismatch) — 510 tests total
+
 ## [1.20.7] - 2026-04-06
 
 ### Changed
