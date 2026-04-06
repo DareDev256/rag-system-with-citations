@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.7] - 2026-04-06
+
+### Changed
+- **Eliminated redundant `analyze_citations` call in diagnostics path** — `_parse_synthesis` now threads its pre-computed `CitationAnalysis` through the synthesis result dict (`_citation_analysis` key), and `build_diagnostics` accepts an optional `citation_analysis` kwarg to reuse it. Same pure function, same inputs — no reason to pay twice on every diagnostics-enabled request
+- **Extracted `_safe_log_query` helper in `main.py`** — inline `re.sub(...)[:200]` log sanitization replaced with a named function, keeping the endpoint handler focused on pipeline orchestration
+
 ## [1.20.6] - 2026-04-05
 
 ### Changed

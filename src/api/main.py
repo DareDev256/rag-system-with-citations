@@ -35,6 +35,13 @@ from src.utils.timing import TimingContext
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
 
+_CONTROL_RE = re.compile(r'[\x00-\x1f\x7f]')
+
+
+def _safe_log_query(query: str, max_len: int = 200) -> str:
+    """Strip control chars and truncate for safe log output."""
+    return _CONTROL_RE.sub(' ', query)[:max_len]
+
 
 @asynccontextmanager
 async def lifespan(app):
@@ -47,7 +54,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.20.6",
+    version="1.20.7",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -111,9 +118,8 @@ async def query_endpoint(request: QueryRequest, req: Request):
 
         # 1. Classify
         category = await classify_query_async(original_query)
-        safe_query = re.sub(r'[\x00-\x1f\x7f]', ' ', original_query)[:200]
         request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
-        logger.info("Query: %s | Category: %s | request_id=%s", safe_query, category, request_id)
+        logger.info("Query: %s | Category: %s | request_id=%s", _safe_log_query(original_query), category, request_id)
 
         # 2. Rewrite if ambiguous
         final_query = original_query
@@ -131,13 +137,15 @@ async def query_endpoint(request: QueryRequest, req: Request):
         # 5. Format Response
         citations = build_citations(search_results, synthesis_result, sanitize_output)
 
-    # 6. Diagnostics (opt-in)
+    # 6. Diagnostics (opt-in) — reuse the CitationAnalysis already
+    #    computed during synthesis to avoid a redundant analyze_citations call.
     diagnostics = None
     if request.include_diagnostics:
         diagnostics = build_diagnostics(
             search_results, synthesis_result["answer"],
             retrieval_timer.ms, synthesis_timer.ms,
             synthesis_result["confidence"],
+            citation_analysis=synthesis_result.get("_citation_analysis"),
         )
 
     return QueryResponse(

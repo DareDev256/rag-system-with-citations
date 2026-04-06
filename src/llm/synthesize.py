@@ -300,6 +300,7 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
         "answer": answer,
         "citations_used": citations_used,
         "confidence": confidence,
+        "_citation_analysis": analysis,
     }
 
 

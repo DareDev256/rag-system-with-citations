@@ -5,12 +5,17 @@ handler so they're independently testable and the handler reads as a
 clean pipeline orchestrator.
 """
 
-from typing import Dict, List, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 from src.api.schemas import Citation, Diagnostics
 from src.eval.metrics import estimate_hallucination_rate, calculate_answer_quality
 from src.llm.prompt import build_context_str
 from src.llm.synthesize import analyze_citations
+
+if TYPE_CHECKING:
+    from src.llm.synthesize import CitationAnalysis
 
 
 def _sanitize_field(text, sanitize_fn) -> str:
@@ -53,13 +58,16 @@ def build_diagnostics(
     retrieval_ms: float,
     synthesis_ms: float,
     confidence: float,
+    *,
+    citation_analysis: Optional[CitationAnalysis] = None,
 ) -> Diagnostics:
     """Compute retrieval diagnostics: coverage, hallucination, quality, timing.
 
-    Separated from the endpoint so diagnostics logic can be tested without
-    standing up the full HTTP stack.
+    When *citation_analysis* is supplied (e.g. from the synthesis result),
+    skips the redundant ``analyze_citations`` call — same pure function,
+    same inputs, no reason to pay twice.
     """
-    analysis = analyze_citations(answer, search_results)
+    analysis = citation_analysis or analyze_citations(answer, search_results)
     context_str = build_context_str(search_results)
     hallucination_rate = estimate_hallucination_rate(answer, context_str)
     quality = calculate_answer_quality(analysis.coverage, hallucination_rate, confidence)
