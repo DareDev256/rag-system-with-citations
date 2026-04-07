@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.20.8-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.20.9-blue?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-510_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-22-e05d44?style=flat-square&logo=shield)
 
@@ -25,7 +25,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **22-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning, indirect prompt injection defense (snippet truncation + injection pattern neutralization + XML delimiter isolation), **metadata schema validation** (CWE-20 — type/length/format enforcement on ingest + storage load)
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **488 tests, zero external deps** — full mock coverage, runs without API keys or FAISS indexes
+- **510 tests, zero external deps** — full mock coverage across 19 suites, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -210,7 +210,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-488 tests across 18 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+510 tests across 19 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -235,6 +235,7 @@ pytest tests/ -v
 | `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
 | `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
 | `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
+| `test_recent_refactors.py` | 22 | CitationAnalysis pipeline, prompt constants, synthesis builder, dimension validation |
 | `test_chunked_bypass.py` | 8 | Chunked encoding enforcement, early abort, multi-chunk accumulation |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.

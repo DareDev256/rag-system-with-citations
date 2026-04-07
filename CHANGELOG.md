@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.20.9] - 2026-04-07
+
+### Changed
+- **README updated to reflect current project state** — test count corrected from 488 → 510 across 19 suites (was 18), added `test_recent_refactors.py` (22 tests covering CitationAnalysis pipeline, prompt constants, synthesis builder, dimension validation) to the test table, updated Key Features test count
+
 ## [1.20.8] - 2026-04-06
 
 ### Added
