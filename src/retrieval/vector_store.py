@@ -134,11 +134,32 @@ class VectorStore:
         self.metadata.extend(docs_metadata)
         
     def save_index(self) -> None:
-        """Persist the FAISS index and metadata to disk."""
+        """Persist the FAISS index and metadata to disk atomically.
+
+        Writes both files to temporary paths first, then renames them via
+        ``os.replace()`` (atomic on POSIX).  Metadata is renamed before
+        the index so that on crash-recovery the invariant
+        ``len(metadata) >= index.ntotal`` always holds — extra metadata
+        entries are harmless, but missing entries cause silent result drops.
+        """
         if self.index:
-            faiss.write_index(self.index, self.index_path)
-            with open(self.metadata_path, "w", encoding="utf-8") as f:
-                json.dump(self.metadata, f, ensure_ascii=False)
+            tmp_meta = self.metadata_path + ".tmp"
+            tmp_index = self.index_path + ".tmp"
+            try:
+                with open(tmp_meta, "w", encoding="utf-8") as f:
+                    json.dump(self.metadata, f, ensure_ascii=False)
+                faiss.write_index(self.index, tmp_index)
+                # Rename order matters: metadata first preserves the
+                # "metadata >= vectors" invariant on crash between renames.
+                os.replace(tmp_meta, self.metadata_path)
+                os.replace(tmp_index, self.index_path)
+            except Exception:
+                for tmp in (tmp_meta, tmp_index):
+                    try:
+                        os.remove(tmp)
+                    except OSError:
+                        pass
+                raise
             logger.info("Index saved.")
 
     def search(self, query_vector: List[float], k: int = 3) -> List[Dict[str, Any]]:

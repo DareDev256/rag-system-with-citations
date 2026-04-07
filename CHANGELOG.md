@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.1] - 2026-04-07
+
+### Fixed
+- **Atomic `save_index()` prevents data corruption on crash** — previously wrote FAISS index and JSON metadata sequentially; a crash between the two writes left the store in an inconsistent state where search results silently disappeared. Now writes to temp files first, then atomically renames via `os.replace()` (metadata first to preserve the `len(metadata) >= index.ntotal` invariant). Temp files are cleaned up on failure. 2 regression tests added (512 total).
+
 ## [1.21.0] - 2026-04-07
 
 ### Changed

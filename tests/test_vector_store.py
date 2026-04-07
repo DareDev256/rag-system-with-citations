@@ -79,27 +79,69 @@ class TestSaveIndex:
         vs = VectorStore()
         vs.save_index()  # should not raise
 
+    @patch("src.retrieval.vector_store.os.replace")
     @patch("src.retrieval.vector_store.faiss.write_index")
     @patch("src.retrieval.vector_store.json.dump")
-    def test_saves_index_and_metadata(self, mock_json, mock_write):
+    def test_saves_index_and_metadata(self, mock_json, mock_write, mock_replace):
         vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.json")
         vs.index = MagicMock()
         vs.metadata = [{"doc_id": "d1"}]
         with patch("builtins.open", mock_open()):
             vs.save_index()
-        mock_write.assert_called_once_with(vs.index, "/tmp/idx.bin")
+        mock_write.assert_called_once_with(vs.index, "/tmp/idx.bin.tmp")
         mock_json.assert_called_once()
         assert mock_json.call_args[0][0] == [{"doc_id": "d1"}]
+        # Metadata renamed before index (crash-safety invariant)
+        assert mock_replace.call_args_list == [
+            (("/tmp/meta.json.tmp", "/tmp/meta.json"),),
+            (("/tmp/idx.bin.tmp", "/tmp/idx.bin"),),
+        ]
 
+    @patch("src.retrieval.vector_store.os.replace")
     @patch("src.retrieval.vector_store.faiss.write_index")
     @patch("src.retrieval.vector_store.json.dump")
-    def test_saves_empty_metadata(self, mock_json, mock_write):
+    def test_saves_empty_metadata(self, mock_json, mock_write, mock_replace):
         vs = VectorStore()
         vs.index = MagicMock()
         vs.metadata = []
         with patch("builtins.open", mock_open()):
             vs.save_index()
         assert mock_json.call_args[0][0] == []
+
+    @patch("src.retrieval.vector_store.os.remove")
+    @patch("src.retrieval.vector_store.os.replace")
+    @patch("src.retrieval.vector_store.faiss.write_index")
+    @patch("src.retrieval.vector_store.json.dump")
+    def test_cleans_temp_files_on_faiss_write_failure(self, mock_json, mock_write, mock_replace, mock_remove):
+        """Regression: crash during save must not leave temp files behind."""
+        mock_write.side_effect = OSError("disk full")
+        vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.json")
+        vs.index = MagicMock()
+        vs.metadata = [{"doc_id": "d1"}]
+        with pytest.raises(OSError, match="disk full"):
+            with patch("builtins.open", mock_open()):
+                vs.save_index()
+        mock_replace.assert_not_called()  # neither file renamed
+        # Both temp files cleaned up
+        cleaned = {c[0][0] for c in mock_remove.call_args_list}
+        assert "/tmp/meta.json.tmp" in cleaned
+        assert "/tmp/idx.bin.tmp" in cleaned
+
+    @patch("src.retrieval.vector_store.os.remove")
+    @patch("src.retrieval.vector_store.os.replace")
+    @patch("src.retrieval.vector_store.faiss.write_index")
+    @patch("src.retrieval.vector_store.json.dump")
+    def test_cleans_temp_files_on_metadata_write_failure(self, mock_json, mock_write, mock_replace, mock_remove):
+        """Regression: metadata write failure must not leave temp files."""
+        mock_json.side_effect = TypeError("not serializable")
+        vs = VectorStore(index_path="/tmp/idx.bin", metadata_path="/tmp/meta.json")
+        vs.index = MagicMock()
+        vs.metadata = [{"doc_id": "d1"}]
+        with pytest.raises(TypeError, match="not serializable"):
+            with patch("builtins.open", mock_open()):
+                vs.save_index()
+        mock_replace.assert_not_called()
+        mock_write.assert_not_called()  # FAISS write never reached
 
 
 class TestDimensionValidation:
