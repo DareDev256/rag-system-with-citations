@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.0] - 2026-04-07
+
+### Changed
+- **Extracted LLM client infrastructure to `src/llm/client.py`** — SSRF validation (`_validate_base_url`), client configuration (`_client_kwargs`), thread-safe singletons (`get_llm_client`, `get_async_llm_client`), model constants, and raw call helpers now live in a dedicated module. `synthesize.py` drops from 393 → 300 lines and focuses purely on synthesis logic (citation analysis, confidence scoring, prompt handling). All 510 tests updated and passing.
+
 ## [1.20.9] - 2026-04-07
 
 ### Changed

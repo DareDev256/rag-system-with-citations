@@ -254,30 +254,30 @@ class TestClientKwargs:
     """Test the _client_kwargs helper that builds OpenAI client config."""
 
     def test_key_only(self):
-        from src.llm.synthesize import _client_kwargs
-        with patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test"}.get(k)):
+        from src.llm.client import _client_kwargs
+        with patch("src.llm.client.os.getenv", side_effect=lambda k, *a: {"OPENAI_API_KEY": "sk-test"}.get(k)):
             kwargs = _client_kwargs()
             assert kwargs == {"api_key": "sk-test"}
 
     def test_key_and_base_url(self):
-        from src.llm.synthesize import _client_kwargs
+        from src.llm.client import _client_kwargs
         env = {"OPENAI_API_KEY": "sk-x", "OPENAI_BASE_URL": "http://proxy:4000/v1"}
-        with patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: env.get(k)):
+        with patch("src.llm.client.os.getenv", side_effect=lambda k, *a: env.get(k)):
             kwargs = _client_kwargs()
             assert kwargs["api_key"] == "sk-x"
             assert kwargs["base_url"] == "http://proxy:4000/v1"
 
     def test_missing_key_still_returns_none(self):
-        from src.llm.synthesize import _client_kwargs
-        with patch("src.llm.synthesize.os.getenv", return_value=None):
+        from src.llm.client import _client_kwargs
+        with patch("src.llm.client.os.getenv", return_value=None):
             kwargs = _client_kwargs()
             assert kwargs["api_key"] is None
             assert "base_url" not in kwargs
 
     def test_empty_base_url_not_included(self):
-        from src.llm.synthesize import _client_kwargs
+        from src.llm.client import _client_kwargs
         env = {"OPENAI_API_KEY": "sk-y", "OPENAI_BASE_URL": ""}
-        with patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: env.get(k)):
+        with patch("src.llm.client.os.getenv", side_effect=lambda k, *a: env.get(k)):
             kwargs = _client_kwargs()
             # Empty string is falsy, should not be included
             assert "base_url" not in kwargs
@@ -290,58 +290,58 @@ class TestBaseUrlSsrfPrevention:
     """_validate_base_url must block non-HTTP schemes and cloud metadata endpoints."""
 
     def test_https_allowed(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         assert _validate_base_url("https://api.openai.com/v1") == "https://api.openai.com/v1"
 
     def test_http_allowed(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         assert _validate_base_url("http://localhost:4000/v1") == "http://localhost:4000/v1"
 
     def test_file_scheme_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="scheme must be http or https"):
             _validate_base_url("file:///etc/passwd")
 
     def test_ftp_scheme_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="scheme must be http or https"):
             _validate_base_url("ftp://evil.com/payload")
 
     def test_gopher_scheme_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="scheme must be http or https"):
             _validate_base_url("gopher://internal:70/")
 
     def test_no_scheme_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError):
             _validate_base_url("just-a-hostname")
 
     def test_aws_metadata_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="blocked metadata endpoint"):
             _validate_base_url("http://169.254.169.254/latest/meta-data/")
 
     def test_gcp_metadata_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="blocked metadata endpoint"):
             _validate_base_url("http://metadata.google.internal/computeMetadata/v1/")
 
     def test_alibaba_metadata_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="blocked metadata endpoint"):
             _validate_base_url("http://100.100.100.200/latest/meta-data/")
 
     def test_empty_hostname_blocked(self):
-        from src.llm.synthesize import _validate_base_url
+        from src.llm.client import _validate_base_url
         with pytest.raises(ValueError, match="no hostname"):
             _validate_base_url("http://")
 
     def test_client_kwargs_validates_base_url(self):
         """_client_kwargs integrates SSRF validation — bad URLs raise before client creation."""
-        from src.llm.synthesize import _client_kwargs
+        from src.llm.client import _client_kwargs
         env = {"OPENAI_API_KEY": "sk-test", "OPENAI_BASE_URL": "file:///etc/shadow"}
-        with patch("src.llm.synthesize.os.getenv", side_effect=lambda k, *a: env.get(k)):
+        with patch("src.llm.client.os.getenv", side_effect=lambda k, *a: env.get(k)):
             with pytest.raises(ValueError, match="scheme must be http or https"):
                 _client_kwargs()
 
@@ -353,31 +353,31 @@ class TestLLMTimeout:
     """Verify OpenAI clients are created with timeout to prevent resource exhaustion."""
 
     def test_default_timeout_value(self):
-        from src.llm.synthesize import _LLM_TIMEOUT
+        from src.llm.client import LLM_TIMEOUT as _LLM_TIMEOUT
         assert _LLM_TIMEOUT == 30
 
     def test_client_created_with_timeout(self):
         """get_llm_client passes timeout kwarg to OpenAI constructor."""
-        import src.llm.synthesize as synth
-        synth._llm_client = None  # force re-creation
-        with patch("src.llm.synthesize.openai.OpenAI") as mock_cls:
+        import src.llm.client as client_mod
+        client_mod._llm_client = None  # force re-creation
+        with patch("src.llm.client.openai.OpenAI") as mock_cls:
             mock_cls.return_value = "fake-client"
-            with patch("src.llm.synthesize._client_kwargs", return_value={"api_key": "k"}):
-                synth.get_llm_client()
+            with patch("src.llm.client._client_kwargs", return_value={"api_key": "k"}):
+                client_mod.get_llm_client()
             mock_cls.assert_called_once_with(api_key="k", timeout=30)
-        synth._llm_client = None
+        client_mod._llm_client = None
 
     @pytest.mark.asyncio
     async def test_async_client_created_with_timeout(self):
         """get_async_llm_client passes timeout kwarg to AsyncOpenAI constructor."""
-        import src.llm.synthesize as synth
-        synth._async_llm_client = None
-        with patch("src.llm.synthesize.openai.AsyncOpenAI") as mock_cls:
+        import src.llm.client as client_mod
+        client_mod._async_llm_client = None
+        with patch("src.llm.client.openai.AsyncOpenAI") as mock_cls:
             mock_cls.return_value = "fake-async"
-            with patch("src.llm.synthesize._client_kwargs", return_value={"api_key": "k"}):
-                await synth.get_async_llm_client()
+            with patch("src.llm.client._client_kwargs", return_value={"api_key": "k"}):
+                await client_mod.get_async_llm_client()
             mock_cls.assert_called_once_with(api_key="k", timeout=30)
-        synth._async_llm_client = None
+        client_mod._async_llm_client = None
 
 
 # ── Error Message Sanitization ───────────────────────────────────
