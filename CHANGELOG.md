@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.3] - 2026-04-09
+
+### Added
+- **30 tests for untested critical code paths** — `_safe_llm_call` / `_safe_llm_call_async` error fallback behavior (8 tests: success parsing, connection errors, runtime errors, parser crashes, kwargs forwarding), `call_llm` / `call_llm_async` raw delegation (3 tests), `_parse_classification` edge cases (8 tests: all valid categories, unknown defaults, whitespace, case sensitivity, empty/multiword junk), `calculate_confidence` `_available_ids` optimization kwarg (3 tests: parity with auto-compute, empty set, superset), `get_available_doc_ids` degenerate inputs (4 tests: empty string, all-None, missing key, mixed types), `extract_cited_doc_ids` edge cases (4 tests: nested brackets, deduplication, empty brackets, available_ids filtering) — 544 tests total across 20 suites
+
 ## [1.21.2] - 2026-04-09
 
 ### Fixed
