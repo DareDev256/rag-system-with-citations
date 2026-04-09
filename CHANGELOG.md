@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.2] - 2026-04-09
+
+### Fixed
+- **Fallback citation path no longer returns empty-string `doc_id`** — when the LLM omits `[doc_id]` citations, `_parse_synthesis` falls back to including the top search result. Previously it took `search_results[:1]` blindly, which could include a result with `doc_id=None`, producing `Citation(doc_id="", ...)` in the API response. Now iterates to find the first result with a valid doc_id; if all results have `None` doc_id, returns no fallback citation instead of a broken one. 2 regression tests added (514 total).
+
 ## [1.21.1] - 2026-04-07
 
 ### Fixed

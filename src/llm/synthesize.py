@@ -197,9 +197,14 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
         if res.get("doc_id") is not None and str(res["doc_id"]) in analysis.valid_cited_ids
     ]
 
-    # Fallback: include top result when LLM doesn't follow citation format
-    if not citations_used and search_results:
-        citations_used = search_results[:1]
+    # Fallback: include first result with a valid doc_id when LLM
+    # doesn't follow citation format.  Skips None doc_ids so the API
+    # never returns a Citation with an empty-string identifier.
+    if not citations_used:
+        for res in search_results:
+            if res.get("doc_id") is not None:
+                citations_used = [res]
+                break
 
     confidence = calculate_confidence(
         answer, search_results, analysis.valid_cited_ids,

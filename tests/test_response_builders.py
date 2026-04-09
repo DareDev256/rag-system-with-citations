@@ -344,3 +344,23 @@ class TestParseSynthesis:
         out = _parse_synthesis(resp, results)
         cited_ids = {c.get("doc_id") for c in out["citations_used"]}
         assert None not in cited_ids
+
+    def test_fallback_skips_none_doc_id_results(self):
+        """Fallback path must skip results with None doc_id (GH bug: empty-string citations)."""
+        from src.llm.synthesize import _parse_synthesis
+        results = [
+            {"doc_id": None, "snippet": "no id"},
+            {"doc_id": "valid_1", "snippet": "has id", "score": 0.8},
+        ]
+        resp = self._make_response("Plain answer with no brackets.")
+        out = _parse_synthesis(resp, results)
+        assert len(out["citations_used"]) == 1
+        assert out["citations_used"][0]["doc_id"] == "valid_1"
+
+    def test_fallback_all_none_doc_ids_returns_empty(self):
+        """When ALL results have None doc_id, fallback should return no citations."""
+        from src.llm.synthesize import _parse_synthesis
+        results = [{"doc_id": None, "snippet": "a"}, {"doc_id": None, "snippet": "b"}]
+        resp = self._make_response("Answer without citations.")
+        out = _parse_synthesis(resp, results)
+        assert out["citations_used"] == []
