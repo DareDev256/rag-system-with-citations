@@ -11,8 +11,6 @@ import os
 import re
 import time
 import uuid
-from collections import defaultdict
-
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -113,28 +111,53 @@ class MaxBodySizeMiddleware:
 # ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────
 _RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1)
 _MAX_TRACKED_IPS = 10_000
-_rate_store: dict = defaultdict(list)
+_rate_store: dict = {}
 
 
 def check_rate_limit(client_ip: str) -> bool:
-    """Return True if request is allowed, False if rate-limited."""
+    """Return True if request is allowed, False if rate-limited.
+
+    Uses a plain dict (not defaultdict) so lookups for unknown IPs don't
+    silently allocate entries — prevents memory growth from scanning or
+    rate-limited IPs that never get a timestamp appended.
+    """
     now = time.monotonic()
     window = now - 60
-    _rate_store[client_ip] = [t for t in _rate_store[client_ip] if t > window]
-    if len(_rate_store[client_ip]) >= _RATE_LIMIT:
+    timestamps = _rate_store.get(client_ip)
+    if timestamps is not None:
+        timestamps[:] = [t for t in timestamps if t > window]
+        if not timestamps:
+            del _rate_store[client_ip]
+            timestamps = None
+    if timestamps is not None and len(timestamps) >= _RATE_LIMIT:
         return False
-    _rate_store[client_ip].append(now)
+    if timestamps is None:
+        _rate_store[client_ip] = [now]
+    else:
+        timestamps.append(now)
     if len(_rate_store) > _MAX_TRACKED_IPS:
         _evict_stale_ips(now)
     return True
 
 
 def _evict_stale_ips(now: float) -> None:
-    """Remove IPs with no recent requests from the rate store."""
+    """Remove IPs with no recent requests, then hard-cap if still over limit.
+
+    Phase 1 (soft): remove IPs whose newest timestamp is outside the window.
+    Phase 2 (hard): if still over _MAX_TRACKED_IPS, sort remaining IPs by
+    their most recent request and drop the oldest half.  This bounds memory
+    under distributed attacks where all IPs are fresh (CWE-770).
+    """
     window = now - 60
     stale = [ip for ip, ts in _rate_store.items() if not ts or ts[-1] <= window]
     for ip in stale:
         del _rate_store[ip]
+    # Hard eviction: if soft pass didn't free enough, drop oldest entries
+    if len(_rate_store) > _MAX_TRACKED_IPS:
+        by_recency = sorted(_rate_store.items(), key=lambda kv: kv[1][-1])
+        to_drop = len(_rate_store) - (_MAX_TRACKED_IPS // 2)
+        for ip, _ in by_recency[:to_drop]:
+            del _rate_store[ip]
 
 
 # ─── API Key Authentication (CWE-862) ────────────────────────────────

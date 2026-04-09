@@ -3,8 +3,8 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.21.3-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-544_passing-2ea44f?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.21.4-blue?style=flat-square)
+![Tests](https://img.shields.io/badge/tests-547_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-22-e05d44?style=flat-square&logo=shield)
 
 A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
@@ -25,7 +25,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **22-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning, indirect prompt injection defense (snippet truncation + injection pattern neutralization + XML delimiter isolation), **metadata schema validation** (CWE-20 — type/length/format enforcement on ingest + storage load)
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **544 tests, zero external deps** — full mock coverage across 20 suites, runs without API keys or FAISS indexes
+- **547 tests, zero external deps** — full mock coverage across 20 suites, runs without API keys or FAISS indexes
 
 ## Architecture
 
@@ -177,7 +177,7 @@ Real metric, not model self-assessment:
 
 | Layer | Defense | CWE |
 |-------|---------|-----|
-| 1 | Rate limiting (per-IP sliding window) | CWE-770 |
+| 1 | Rate limiting (per-IP sliding window, hard-capped memory) | CWE-770 |
 | 2 | Trusted proxy IP resolution | CWE-348 |
 | 3 | API key auth (constant-time comparison) | CWE-862 |
 | 4 | Request body size cap (Content-Length + chunked) | CWE-400 |
@@ -210,7 +210,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-544 tests across 20 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+547 tests across 20 suites. All mocked — runs without API keys, FAISS indexes, or network access:
 
 ```bash
 pytest tests/ -v
@@ -218,7 +218,7 @@ pytest tests/ -v
 
 | Suite | Tests | Scope |
 |-------|------:|-------|
-| `test_hardening.py` | 92 | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
+| `test_hardening.py` | 95 | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
 | `test_edge_cases.py` | 62 | Unicode, boundary values, type coercion, hallucination edge cases |
 | `test_core.py` | 52 | Citation extraction, confidence scoring, schema validation, metrics |
 | `test_response_builders.py` | 40 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |

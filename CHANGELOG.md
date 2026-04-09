@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.4] - 2026-04-09
+
+### Fixed
+- **Rate limiter memory exhaustion under distributed attacks (CWE-770)** — `check_rate_limit` used `defaultdict(list)`, which silently allocated entries for every IP lookup, even rate-limited ones that never got a timestamp. Under IP rotation attacks, `_evict_stale_ips` only removed IPs outside the 60s window; when all IPs were fresh, eviction removed nothing and the dict grew unboundedly. Fixed by switching to a plain `dict` with `.get()` (no phantom entries), pruning empty entries eagerly on access, and adding hard eviction that drops the oldest half of entries when soft eviction fails to free enough space. 3 regression tests added (547 total).
+
 ## [1.21.3] - 2026-04-09
 
 ### Added

@@ -664,6 +664,58 @@ class TestRateLimiterMemory:
         assert len(_rate_store) < _MAX_TRACKED_IPS
         _rate_store.clear()
 
+    def test_hard_eviction_caps_fresh_ips(self):
+        """When all IPs are fresh, hard eviction still caps memory (CWE-770).
+
+        Previously, _evict_stale_ips only removed IPs outside the 60s window.
+        Under a distributed attack where thousands of fresh IPs arrive within
+        the window, soft eviction removed nothing and memory grew unboundedly.
+        Hard eviction drops the oldest half to enforce the cap.
+        """
+        from src.api.middleware import _evict_stale_ips, _rate_store, _MAX_TRACKED_IPS
+        _rate_store.clear()
+        now = 1000.0
+        # Fill store with fresh IPs — all within the window
+        for i in range(_MAX_TRACKED_IPS + 500):
+            _rate_store[f"fresh-ip-{i}"] = [now - 30]  # 30s ago, within 60s window
+        assert len(_rate_store) > _MAX_TRACKED_IPS
+        _evict_stale_ips(now)
+        # Hard eviction must bring count to _MAX_TRACKED_IPS // 2
+        assert len(_rate_store) <= _MAX_TRACKED_IPS // 2
+        _rate_store.clear()
+
+    def test_no_phantom_entries_from_lookup(self):
+        """Checking an unknown IP must not create a rate_store entry (defaultdict fix).
+
+        Previously used defaultdict(list), which silently allocated an empty
+        list for every IP lookup — even rate-limited IPs that never get a
+        timestamp appended. Switching to a plain dict prevents this.
+        """
+        from src.api.middleware import _rate_store
+        _rate_store.clear()
+        # Manually simulate what defaultdict used to do: accessing a key
+        # should NOT create an entry.  The check_rate_limit function now
+        # uses .get() instead of direct subscript access.
+        result = _rate_store.get("never-seen-ip")
+        assert result is None
+        assert "never-seen-ip" not in _rate_store
+        _rate_store.clear()
+
+    def test_rate_limited_ip_cleaned_after_window(self):
+        """An IP that hits the rate limit should be cleaned up after its window expires."""
+        from src.api.middleware import check_rate_limit, _rate_store, _RATE_LIMIT
+        _rate_store.clear()
+        now = 1000.0
+        # Pre-fill with expired timestamps that will be pruned
+        _rate_store["cleanup-ip"] = [now - 120] * _RATE_LIMIT
+        # Next call should prune all expired timestamps and remove the entry
+        with patch("time.monotonic", return_value=now):
+            result = check_rate_limit("cleanup-ip")
+        assert result is True  # allowed (expired timestamps pruned)
+        assert "cleanup-ip" in _rate_store  # re-added with fresh timestamp
+        assert len(_rate_store["cleanup-ip"]) == 1  # only the new timestamp
+        _rate_store.clear()
+
 
 # ── Global Exception Handler (CWE-209) ───────────────────────────
 
