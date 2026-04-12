@@ -1,11 +1,15 @@
-"""Middleware tests — MaxBodySize, RequestID, and global exception handler.
+"""Middleware tests — MaxBodySize, RequestID, rate limiter thread safety,
+and global exception handler.
 
 These tests verify the security perimeter that runs on every request:
 - MaxBodySizeMiddleware rejects oversized payloads before Pydantic parsing (CWE-400)
 - RequestIDMiddleware assigns/validates request IDs for incident correlation
+- Rate limiter thread safety under concurrent access (CWE-362)
 - Global exception handler suppresses stack traces on 500s (CWE-209)
 """
 import os
+import threading
+import time
 import uuid
 from unittest.mock import patch, AsyncMock
 
@@ -210,3 +214,99 @@ class TestGlobalExceptionHandler:
         assert "/app/src/" not in body
         assert "traceback" not in body.lower()
         assert "File " not in body
+
+
+# ── Rate Limiter Thread Safety (CWE-362) ────────────────────────
+
+
+class TestRateLimiterThreadSafety:
+    """Verify rate limiter is safe under concurrent access."""
+
+    def setup_method(self):
+        """Reset rate store between tests."""
+        from src.api.middleware import _rate_store
+        _rate_store.clear()
+
+    def test_concurrent_same_ip_no_crash(self):
+        """Concurrent requests from the same IP must not raise RuntimeError."""
+        from src.api.middleware import check_rate_limit
+        errors = []
+
+        def hammer(ip):
+            try:
+                for _ in range(50):
+                    check_rate_limit(ip)
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=hammer, args=("10.0.0.1",)) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == [], f"Concurrent access raised: {errors}"
+
+    def test_concurrent_distinct_ips_no_crash(self):
+        """Many distinct IPs hammered concurrently must not corrupt the dict."""
+        from src.api.middleware import check_rate_limit
+        errors = []
+
+        def hammer(thread_id):
+            try:
+                for i in range(50):
+                    check_rate_limit(f"10.{thread_id}.0.{i}")
+            except Exception as e:
+                errors.append(e)
+
+        threads = [threading.Thread(target=hammer, args=(tid,)) for tid in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert errors == [], f"Concurrent access raised: {errors}"
+
+    def test_eviction_under_contention_no_crash(self):
+        """Hard eviction triggered while other threads mutate must not raise."""
+        from src.api import middleware
+        from src.api.middleware import check_rate_limit, _rate_store
+        old_max = middleware._MAX_TRACKED_IPS
+        errors = []
+        try:
+            middleware._MAX_TRACKED_IPS = 20  # force frequent eviction
+
+            def hammer(thread_id):
+                try:
+                    for i in range(60):
+                        check_rate_limit(f"192.{thread_id}.{i}.1")
+                except Exception as e:
+                    errors.append(e)
+
+            threads = [threading.Thread(target=hammer, args=(tid,)) for tid in range(6)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+            assert errors == [], f"Eviction under contention raised: {errors}"
+        finally:
+            middleware._MAX_TRACKED_IPS = old_max
+            _rate_store.clear()
+
+    def test_rate_lock_exists(self):
+        """The module must expose a threading.Lock for rate store protection."""
+        from src.api.middleware import _rate_lock
+        assert isinstance(_rate_lock, type(threading.Lock()))
+
+    def test_rate_limit_still_enforced_after_threading(self):
+        """Rate limiting logic must still correctly block after concurrent load."""
+        from src.api import middleware
+        from src.api.middleware import check_rate_limit, _rate_store
+        old_limit = middleware._RATE_LIMIT
+        try:
+            middleware._RATE_LIMIT = 5
+            _rate_store.clear()
+            results = [check_rate_limit("1.2.3.4") for _ in range(10)]
+            assert results[:5] == [True] * 5
+            assert results[5:] == [False] * 5
+        finally:
+            middleware._RATE_LIMIT = old_limit
+            _rate_store.clear()

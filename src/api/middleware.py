@@ -9,6 +9,7 @@ import hmac
 import logging
 import os
 import re
+import threading
 import time
 import uuid
 from fastapi import Request
@@ -112,10 +113,15 @@ class MaxBodySizeMiddleware:
 _RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1)
 _MAX_TRACKED_IPS = 10_000
 _rate_store: dict = {}
+_rate_lock = threading.Lock()
 
 
 def check_rate_limit(client_ip: str) -> bool:
     """Return True if request is allowed, False if rate-limited.
+
+    Thread-safe via _rate_lock — FastAPI dispatches sync handlers across
+    a thread pool, so concurrent requests would otherwise race on dict
+    mutation (CWE-362).
 
     Uses a plain dict (not defaultdict) so lookups for unknown IPs don't
     silently allocate entries — prevents memory growth from scanning or
@@ -123,25 +129,28 @@ def check_rate_limit(client_ip: str) -> bool:
     """
     now = time.monotonic()
     window = now - 60
-    timestamps = _rate_store.get(client_ip)
-    if timestamps is not None:
-        timestamps[:] = [t for t in timestamps if t > window]
-        if not timestamps:
-            del _rate_store[client_ip]
-            timestamps = None
-    if timestamps is not None and len(timestamps) >= _RATE_LIMIT:
-        return False
-    if timestamps is None:
-        _rate_store[client_ip] = [now]
-    else:
-        timestamps.append(now)
-    if len(_rate_store) > _MAX_TRACKED_IPS:
-        _evict_stale_ips(now)
+    with _rate_lock:
+        timestamps = _rate_store.get(client_ip)
+        if timestamps is not None:
+            timestamps[:] = [t for t in timestamps if t > window]
+            if not timestamps:
+                del _rate_store[client_ip]
+                timestamps = None
+        if timestamps is not None and len(timestamps) >= _RATE_LIMIT:
+            return False
+        if timestamps is None:
+            _rate_store[client_ip] = [now]
+        else:
+            timestamps.append(now)
+        if len(_rate_store) > _MAX_TRACKED_IPS:
+            _evict_stale_ips(now)
     return True
 
 
 def _evict_stale_ips(now: float) -> None:
     """Remove IPs with no recent requests, then hard-cap if still over limit.
+
+    MUST be called while holding _rate_lock.
 
     Phase 1 (soft): remove IPs whose newest timestamp is outside the window.
     Phase 2 (hard): if still over _MAX_TRACKED_IPS, sort remaining IPs by

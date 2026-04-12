@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.5] - 2026-04-12
+
+### Fixed
+- **Rate limiter thread safety (CWE-362)** — `check_rate_limit` and `_evict_stale_ips` mutated the shared `_rate_store` dict without synchronization. Under concurrent FastAPI requests (thread pool dispatch), this caused `RuntimeError: dictionary changed size during iteration` during eviction and data races on timestamp lists. Added `threading.Lock` around all `_rate_store` mutations. 5 regression tests added covering concurrent same-IP, distinct-IP, and eviction-under-contention scenarios.
+- **Embedder singleton race condition (CWE-362)** — `Embedder.__new__` claimed "thread-safe singleton" but had no locking. Two threads calling `Embedder()` simultaneously could both pass the `_instance is None` check and load the model twice, wasting memory and producing non-deterministic state. Added double-checked locking with `threading.Lock`. 2 regression tests added (554 total).
+
 ## [1.21.4] - 2026-04-09
 
 ### Fixed

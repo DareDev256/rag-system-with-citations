@@ -1,9 +1,10 @@
 """Tests for the retrieval orchestration layer.
 
-Covers perform_search, get_search_engine, and Embedder singleton
-by mocking FAISS and SentenceTransformer — no model downloads or
-index files required.
+Covers perform_search, get_search_engine, Embedder singleton, and
+thread-safety guarantees — by mocking FAISS and SentenceTransformer
+so no model downloads or index files are required.
 """
+import threading
 from unittest.mock import patch, MagicMock, PropertyMock
 
 import numpy as np
@@ -268,3 +269,33 @@ class TestPerformSearch:
 
         perform_search("q")
         mock_store.search.assert_called_once_with([0.1], k=3)
+
+
+# ── Embedder Thread Safety (CWE-362) ──────────────────────────
+
+
+class TestEmbedderThreadSafety:
+    """Verify the Embedder singleton is truly thread-safe."""
+
+    @patch("src.retrieval.embed.SentenceTransformer")
+    def test_concurrent_init_creates_single_instance(self, mock_st):
+        """Multiple threads racing to create the singleton must produce exactly one."""
+        mock_st.return_value = MagicMock()
+        instances = []
+        barrier = threading.Barrier(8)
+
+        def create():
+            barrier.wait()  # maximize contention
+            instances.append(Embedder())
+
+        threads = [threading.Thread(target=create) for _ in range(8)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert all(inst is instances[0] for inst in instances)
+
+    def test_embedder_has_lock(self):
+        """Embedder class must have a threading.Lock for singleton protection."""
+        assert hasattr(Embedder, "_lock")
+        assert isinstance(Embedder._lock, type(threading.Lock()))

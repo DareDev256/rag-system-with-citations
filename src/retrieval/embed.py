@@ -11,6 +11,7 @@ from typing import List
 import logging
 import os
 import re
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -44,25 +45,29 @@ EMBEDDING_MODEL = _validate_model_name(
 class Embedder:
     """Thread-safe singleton wrapper around SentenceTransformer.
 
-    Uses __new__ to guarantee a single model instance across all threads.
-    If the initial model load fails (OOM, network error, missing model),
-    the singleton stays unset so subsequent calls retry cleanly instead
-    of returning a half-initialized instance.
+    Uses __new__ with double-checked locking to guarantee a single model
+    instance across all threads (CWE-362). If the initial model load fails
+    (OOM, network error, missing model), the singleton stays unset so
+    subsequent calls retry cleanly instead of returning a half-initialized
+    instance.
     """
 
     _instance = None
+    _lock = threading.Lock()
 
     def __new__(cls):
         if cls._instance is None:
-            instance = super(Embedder, cls).__new__(cls)
-            logger.info("Loading embedding model: %s", EMBEDDING_MODEL)
-            try:
-                instance.model = SentenceTransformer(EMBEDDING_MODEL)
-            except Exception:
-                logger.exception("Failed to load embedding model: %s", EMBEDDING_MODEL)
-                raise
-            cls._instance = instance
-            logger.info("Embedding model loaded.")
+            with cls._lock:
+                if cls._instance is None:
+                    instance = super(Embedder, cls).__new__(cls)
+                    logger.info("Loading embedding model: %s", EMBEDDING_MODEL)
+                    try:
+                        instance.model = SentenceTransformer(EMBEDDING_MODEL)
+                    except Exception:
+                        logger.exception("Failed to load embedding model: %s", EMBEDDING_MODEL)
+                        raise
+                    cls._instance = instance
+                    logger.info("Embedding model loaded.")
         return cls._instance
 
     def encode(self, texts: List[str]) -> List[List[float]]:
