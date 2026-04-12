@@ -6,7 +6,7 @@ type coercion, and error paths not reached by existing test suites.
 import pytest
 from pydantic import ValidationError
 
-from src.llm.synthesize import extract_cited_doc_ids, calculate_confidence
+from src.llm.citations import extract_cited_doc_ids, calculate_confidence
 from src.llm.prompt import build_context_str
 from src.eval.metrics import calculate_citation_coverage, estimate_hallucination_rate
 from src.utils.timing import measure_latency
@@ -153,22 +153,22 @@ class TestGetAvailableDocIdsFalsyRegression:
     """Verify get_available_doc_ids uses ``is not None`` — not falsy check."""
 
     def test_zero_doc_id_included(self):
-        from src.llm.synthesize import get_available_doc_ids
+        from src.llm.citations import get_available_doc_ids
         results = [{"doc_id": 0, "snippet": "x"}]
         assert get_available_doc_ids(results) == {"0"}  # coerced to str for set-intersection safety
 
     def test_empty_string_doc_id_included(self):
-        from src.llm.synthesize import get_available_doc_ids
+        from src.llm.citations import get_available_doc_ids
         results = [{"doc_id": "", "snippet": "x"}]
         assert get_available_doc_ids(results) == {""}
 
     def test_none_doc_id_excluded(self):
-        from src.llm.synthesize import get_available_doc_ids
+        from src.llm.citations import get_available_doc_ids
         results = [{"doc_id": None, "snippet": "x"}]
         assert get_available_doc_ids(results) == set()
 
     def test_missing_doc_id_excluded(self):
-        from src.llm.synthesize import get_available_doc_ids
+        from src.llm.citations import get_available_doc_ids
         results = [{"snippet": "x"}]
         assert get_available_doc_ids(results) == set()
 
@@ -224,7 +224,7 @@ class TestAnalyzeCitationsIntegerDocIds:
     """
 
     def test_integer_doc_id_detected_as_cited(self):
-        from src.llm.synthesize import analyze_citations
+        from src.llm.citations import analyze_citations
         results = [{"doc_id": 0, "snippet": "data"}, {"doc_id": 1, "snippet": "more"}]
         analysis = analyze_citations("Answer from [0] and [1].", results)
         assert "0" in analysis.valid_cited_ids
@@ -233,14 +233,14 @@ class TestAnalyzeCitationsIntegerDocIds:
         assert analysis.coverage == 1.0
 
     def test_mixed_int_and_string_doc_ids(self):
-        from src.llm.synthesize import analyze_citations
+        from src.llm.citations import analyze_citations
         results = [{"doc_id": 0, "snippet": "x"}, {"doc_id": "d1", "snippet": "y"}]
         analysis = analyze_citations("See [0] and [d1].", results)
         assert analysis.valid_cited_ids == frozenset({"0", "d1"})
         assert analysis.coverage == 1.0
 
     def test_integer_doc_id_confidence_not_degraded(self):
-        from src.llm.synthesize import calculate_confidence
+        from src.llm.citations import calculate_confidence
         results = [{"doc_id": 0, "snippet": "x"}]
         conf = calculate_confidence("Answer [0].", results, {"0"})
         assert conf == 1.0  # not 0.3 from type-mismatch

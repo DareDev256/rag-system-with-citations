@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.22.0] - 2026-04-12
+
+### Changed
+- **Extracted citation analysis into `src/llm/citations.py`** — `CitationAnalysis` dataclass, `analyze_citations()`, `calculate_confidence()`, `extract_cited_doc_ids()`, `get_available_doc_ids()`, and `CITATION_PATTERN` moved from `synthesize.py` to a dedicated module. `synthesize.py` now focuses solely on LLM orchestration (safe-call wrappers, classification/synthesis entry points, prompt constants). All 7 test files and 2 src modules updated to import from `src.llm.citations` directly — no re-exports, no backward-compat shims. 554 tests pass unchanged.
+
 ## [1.21.6] - 2026-04-12
 
 ### Added

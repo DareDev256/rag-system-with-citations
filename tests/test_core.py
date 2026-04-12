@@ -8,7 +8,7 @@ import pytest
 from pydantic import ValidationError
 
 from src.api.schemas import QueryRequest, QueryResponse, Citation
-from src.llm.synthesize import extract_cited_doc_ids, calculate_confidence
+from src.llm.citations import extract_cited_doc_ids, calculate_confidence
 from src.llm.prompt import build_context_str
 from src.eval.metrics import calculate_citation_coverage, estimate_hallucination_rate
 from src.data.ingest import load_documents

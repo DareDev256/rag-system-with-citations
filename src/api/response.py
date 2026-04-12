@@ -11,11 +11,11 @@ from typing import TYPE_CHECKING, Dict, List, Optional
 
 from src.api.schemas import Citation, Diagnostics
 from src.eval.metrics import estimate_hallucination_rate, calculate_answer_quality
+from src.llm.citations import analyze_citations
 from src.llm.prompt import build_context_str
-from src.llm.synthesize import analyze_citations
 
 if TYPE_CHECKING:
-    from src.llm.synthesize import CitationAnalysis
+    from src.llm.citations import CitationAnalysis
 
 
 def _sanitize_field(text, sanitize_fn) -> str:

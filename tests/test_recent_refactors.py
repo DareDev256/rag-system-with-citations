@@ -12,9 +12,8 @@ Targets:
 import pytest
 from unittest.mock import MagicMock
 
+from src.llm.citations import analyze_citations, CitationAnalysis
 from src.llm.synthesize import (
-    analyze_citations,
-    CitationAnalysis,
     _build_synthesis_prompt,
     _parse_synthesis,
     CLASSIFIER_SYSTEM_PROMPT,

@@ -13,14 +13,12 @@ LLM traffic flows through but had zero dedicated tests:
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
 
+from src.llm.citations import calculate_confidence, get_available_doc_ids, extract_cited_doc_ids
 from src.llm.synthesize import (
     _safe_llm_call,
     _safe_llm_call_async,
     _parse_classification,
     _parse_synthesis,
-    calculate_confidence,
-    get_available_doc_ids,
-    extract_cited_doc_ids,
     _SYNTHESIS_ERROR,
 )
 from src.llm.client import call_llm, call_llm_async

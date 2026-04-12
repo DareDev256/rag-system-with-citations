@@ -11,9 +11,9 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from src.llm.prompt import format_rag_prompt, format_classification_prompt, build_context_str
+from src.llm.citations import calculate_confidence, extract_cited_doc_ids, CITATION_PATTERN
 from src.llm.synthesize import (
     _parse_synthesis, _parse_classification, _client_kwargs,
-    calculate_confidence, extract_cited_doc_ids, CITATION_PATTERN,
     _SYNTHESIS_ERROR, _classification_messages, _synthesis_messages,
 )
 from src.api.response import build_diagnostics, build_citations, _sanitize_field
