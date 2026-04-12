@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.21.6] - 2026-04-12
+
+### Added
+- **Synthesis pipeline documentation (`docs/synthesis-pipeline.md`)** — comprehensive deep-dive into `analyze_citations()`, `CitationAnalysis` dataclass, `calculate_confidence()` scoring algorithm, `_safe_llm_call` error handling, diagnostics pipeline data flow, quality score formula weights, citation regex design, prompt injection defense layers, and guidance for adding new LLM entry points. This is the first dedicated documentation for the system's core value proposition: citation-enforced answers with confidence scoring.
+
 ## [1.21.5] - 2026-04-12
 
 ### Fixed

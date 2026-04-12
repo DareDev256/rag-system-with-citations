@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.21.5-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.21.6-blue?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-554_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-22-e05d44?style=flat-square&logo=shield)
 
@@ -204,6 +204,7 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ### Deep Dives
 
+- **[Synthesis Pipeline](docs/synthesis-pipeline.md)** — `analyze_citations()`, `CitationAnalysis` dataclass, confidence scoring algorithm, diagnostics pipeline, prompt injection defense
 - **[Security Architecture](docs/security.md)** — full threat model, 22-layer CWE mapping, configuration reference, known gaps
 - **[Proxy Integration](docs/proxy-integration.md)** — LiteLLM, OpenRouter, Ollama, vLLM setup guides
 - **[SocialBu MCP Integration](docs/socialbu-mcp-integration.md)** — connect AI agents to SocialBu for automated social media posting via MCP + OpenAPI proxy
