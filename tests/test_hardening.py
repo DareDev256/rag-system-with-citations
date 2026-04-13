@@ -295,7 +295,7 @@ class TestBaseUrlSsrfPrevention:
 
     def test_http_allowed(self):
         from src.llm.client import _validate_base_url
-        assert _validate_base_url("http://localhost:4000/v1") == "http://localhost:4000/v1"
+        assert _validate_base_url("http://proxy.example.com:4000/v1") == "http://proxy.example.com:4000/v1"
 
     def test_file_scheme_blocked(self):
         from src.llm.client import _validate_base_url
@@ -337,6 +337,47 @@ class TestBaseUrlSsrfPrevention:
         with pytest.raises(ValueError, match="no hostname"):
             _validate_base_url("http://")
 
+    # ── Private/loopback IP blocking (CWE-918) ─────────────────
+
+    def test_localhost_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://localhost:4000/v1")
+
+    def test_loopback_ipv4_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://127.0.0.1:8080/v1")
+
+    def test_loopback_ipv6_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://[::1]:8080/v1")
+
+    def test_rfc1918_10_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://10.0.0.1:4000/v1")
+
+    def test_rfc1918_172_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://172.16.0.1:4000/v1")
+
+    def test_rfc1918_192_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://192.168.1.1:4000/v1")
+
+    def test_unspecified_0000_blocked(self):
+        from src.llm.client import _validate_base_url
+        with pytest.raises(ValueError, match="private/loopback"):
+            _validate_base_url("http://0.0.0.0:8000/v1")
+
+    def test_public_ip_allowed(self):
+        from src.llm.client import _validate_base_url
+        assert _validate_base_url("http://8.8.8.8:4000/v1") == "http://8.8.8.8:4000/v1"
+
     def test_client_kwargs_validates_base_url(self):
         """_client_kwargs integrates SSRF validation — bad URLs raise before client creation."""
         from src.llm.client import _client_kwargs
@@ -344,6 +385,33 @@ class TestBaseUrlSsrfPrevention:
         with patch("src.llm.client.os.getenv", side_effect=lambda k, *a: env.get(k)):
             with pytest.raises(ValueError, match="scheme must be http or https"):
                 _client_kwargs()
+
+
+# ── safe_int_env max_val bounds (CWE-400) ──────────────────────
+
+
+class TestSafeIntEnvMaxVal:
+    """safe_int_env rejects values above max_val to prevent resource exhaustion."""
+
+    def test_within_bounds(self):
+        from src.utils.env import safe_int_env
+        with patch.dict(os.environ, {"TEST_VAR": "50"}):
+            assert safe_int_env("TEST_VAR", 10, min_val=1, max_val=100) == 50
+
+    def test_above_max_returns_default(self):
+        from src.utils.env import safe_int_env
+        with patch.dict(os.environ, {"TEST_VAR": "999999999"}):
+            assert safe_int_env("TEST_VAR", 30, min_val=1, max_val=300) == 30
+
+    def test_below_min_returns_default(self):
+        from src.utils.env import safe_int_env
+        with patch.dict(os.environ, {"TEST_VAR": "0"}):
+            assert safe_int_env("TEST_VAR", 30, min_val=1, max_val=300) == 30
+
+    def test_max_val_alone(self):
+        from src.utils.env import safe_int_env
+        with patch.dict(os.environ, {"TEST_VAR": "500"}):
+            assert safe_int_env("TEST_VAR", 10, max_val=100) == 10
 
 
 # ── LLM Timeout Configuration ───────────────────────────────────

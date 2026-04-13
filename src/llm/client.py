@@ -7,6 +7,7 @@ from here to get a ready-to-use client without caring about connection details.
 """
 
 import asyncio
+import ipaddress
 import logging
 import os
 import threading
@@ -25,7 +26,7 @@ CLASSIFICATION_MODEL = os.getenv("CLASSIFICATION_MODEL", "gpt-4o-mini")
 SYNTHESIS_MODEL = os.getenv("SYNTHESIS_MODEL", DEFAULT_MODEL)
 
 # Request timeout in seconds — prevents resource exhaustion from hung upstreams
-LLM_TIMEOUT = safe_int_env("LLM_TIMEOUT", 30, min_val=1)
+LLM_TIMEOUT = safe_int_env("LLM_TIMEOUT", 30, min_val=1, max_val=300)
 
 # ─── SSRF Prevention (CWE-918) ──────────────────────────────────────
 _ALLOWED_SCHEMES = {"https", "http"}
@@ -36,14 +37,43 @@ _BLOCKED_HOSTS = frozenset({
 })
 
 
+_BLOCKED_HOSTNAMES = frozenset({"localhost", "localhost."})
+
+
+def _is_private_ip(hostname: str) -> bool:
+    """Check whether *hostname* is a private/loopback/link-local address.
+
+    Catches SSRF attacks that bypass the hostname blocklist by using raw
+    IPs (127.0.0.1, 10.x.x.x, 172.16.x.x, 192.168.x.x, ::1, fe80::, etc.),
+    the special 0.0.0.0 address, or the ``localhost`` hostname.
+    """
+    if hostname.lower() in _BLOCKED_HOSTNAMES:
+        return True
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return (
+            addr.is_loopback        # 127.0.0.0/8, ::1
+            or addr.is_private      # 10/8, 172.16/12, 192.168/16, fc00::/7
+            or addr.is_link_local   # 169.254/16, fe80::/10
+            or addr.is_reserved     # 0.0.0.0, 255.255.255.255, etc.
+            or addr.is_multicast    # 224.0.0.0/4, ff00::/8
+            or addr.is_unspecified  # 0.0.0.0, ::
+        )
+    except ValueError:
+        return False  # Not an IP literal — hostname-based, checked against blocklist
+
+
 def _validate_base_url(url: str) -> str:
     """Validate OPENAI_BASE_URL to prevent SSRF attacks.
 
-    Only allows http:// and https:// schemes; blocks known cloud metadata
-    endpoints and rejects file://, ftp://, gopher://, etc.
+    Defence layers:
+    1. Scheme allowlist — only http:// and https://
+    2. Hostname blocklist — known cloud metadata endpoints
+    3. Private IP blocklist — loopback, RFC-1918, link-local, multicast
 
     Raises:
-        ValueError: If the URL uses a disallowed scheme or targets a blocked host.
+        ValueError: If the URL uses a disallowed scheme, targets a blocked
+                    host, or resolves to a private IP range.
     """
     parsed = urlparse(url)
     if parsed.scheme not in _ALLOWED_SCHEMES:
@@ -51,12 +81,16 @@ def _validate_base_url(url: str) -> str:
             f"OPENAI_BASE_URL scheme must be http or https, got '{parsed.scheme}'"
         )
     hostname = parsed.hostname or ""
+    if not hostname:
+        raise ValueError("OPENAI_BASE_URL has no hostname")
     if hostname in _BLOCKED_HOSTS:
         raise ValueError(
             f"OPENAI_BASE_URL targets a blocked metadata endpoint: {hostname}"
         )
-    if not hostname:
-        raise ValueError("OPENAI_BASE_URL has no hostname")
+    if _is_private_ip(hostname):
+        raise ValueError(
+            f"OPENAI_BASE_URL targets a private/loopback address: {hostname}"
+        )
     return url
 
 

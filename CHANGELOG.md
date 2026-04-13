@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.24.0] - 2026-04-13
+
+### Security
+- **SSRF: Block private/loopback IPs in `OPENAI_BASE_URL` (CWE-918)** — `_validate_base_url` previously only blocked cloud metadata endpoints (169.254.169.254, metadata.google.internal). Now also blocks loopback (127.0.0.1, ::1), RFC-1918 private ranges (10/8, 172.16/12, 192.168/16), link-local, multicast, unspecified (0.0.0.0), and the `localhost` hostname. Prevents attackers with env var access from probing internal services.
+- **Bounded env var integers with `max_val` (CWE-400)** — `safe_int_env` now supports an upper bound. Applied to `MAX_BODY_BYTES` (≤10MB), `RATE_LIMIT_RPM` (≤1000), `LLM_TIMEOUT` (≤300s), `HSTS_MAX_AGE` (≤2 years). Prevents resource exhaustion or security bypass via absurdly large env var values.
+- **Security headers on ASGI-level error responses** — `MaxBodySizeMiddleware._send_json()` now includes `X-Content-Type-Options`, `X-Frame-Options`, `CSP`, `HSTS`, `Cache-Control`, and `Referrer-Policy` headers on 413/400 responses. Previously these responses bypassed the middleware stack and lacked all security headers.
+
+### Added
+- 12 new security tests (566 total): 8 for private IP SSRF blocking, 4 for `safe_int_env` `max_val` bounds.
+
 ## [1.23.0] - 2026-04-13
 
 ### Changed

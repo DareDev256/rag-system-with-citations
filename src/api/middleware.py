@@ -25,7 +25,7 @@ logger = logging.getLogger("rag_api")
 
 
 # ─── Request Body Size Limit (CWE-400) ───────────────────────────────
-_MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024)
+_MAX_BODY_BYTES = safe_int_env("MAX_BODY_BYTES", 65_536, min_val=1024, max_val=10_485_760)
 
 
 class _BodyTooLargeError(Exception):
@@ -86,22 +86,36 @@ class MaxBodySizeMiddleware:
 
     @staticmethod
     async def _send_json(send, status: int, detail: str):
-        """Send a JSON error response via raw ASGI send."""
+        """Send a JSON error response via raw ASGI send with security headers.
+
+        This bypasses the middleware stack (runs at ASGI level), so we must
+        attach security headers directly — otherwise 413/400 responses leak
+        without X-Content-Type-Options, X-Frame-Options, CSP, etc.
+        """
         import json as _json
         body = _json.dumps({"detail": detail}).encode()
+        csp = os.getenv("CSP_POLICY", _DEFAULT_CSP)
+        hsts = f"max-age={_HSTS_MAX_AGE}; includeSubDomains; preload"
+        headers = [
+            [b"content-type", b"application/json"],
+            [b"content-length", str(len(body)).encode()],
+            [b"x-content-type-options", b"nosniff"],
+            [b"x-frame-options", b"DENY"],
+            [b"content-security-policy", csp.encode()],
+            [b"strict-transport-security", hsts.encode()],
+            [b"cache-control", b"no-store"],
+            [b"referrer-policy", b"strict-origin-when-cross-origin"],
+        ]
         await send({
             "type": "http.response.start",
             "status": status,
-            "headers": [
-                [b"content-type", b"application/json"],
-                [b"content-length", str(len(body)).encode()],
-            ],
+            "headers": headers,
         })
         await send({"type": "http.response.body", "body": body})
 
 
 # ─── Rate Limiter (in-memory, per-IP) ────────────────────────────────
-_RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1)
+_RATE_LIMIT = safe_int_env("RATE_LIMIT_RPM", 30, min_val=1, max_val=1000)
 _MAX_TRACKED_IPS = 10_000
 _rate_store: dict = {}
 _rate_lock = threading.Lock()
@@ -202,7 +216,7 @@ _DEFAULT_CSP = (
     "upgrade-insecure-requests"
 )
 
-_HSTS_MAX_AGE = safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0)
+_HSTS_MAX_AGE = safe_int_env("HSTS_MAX_AGE", 63072000, min_val=0, max_val=63072000)
 
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
