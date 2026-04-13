@@ -597,7 +597,7 @@ class TestOutputSanitization:
 
     def test_sanitize_output_unit(self):
         """Direct unit test for _sanitize_output."""
-        from src.api.middleware import sanitize_output
+        from src.utils.sanitize import sanitize_output
         assert sanitize_output("clean") == "clean"
         assert sanitize_output("a\x00b\x08c\x7fd") == "abcd"
         assert sanitize_output("keep\nnewlines\tand\rtabs") == "keep\nnewlines\tand\rtabs"

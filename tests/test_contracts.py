@@ -16,7 +16,8 @@ from src.llm.synthesize import (
     _parse_synthesis, _parse_classification, _client_kwargs,
     _SYNTHESIS_ERROR, _classification_messages, _synthesis_messages,
 )
-from src.api.response import build_diagnostics, build_citations, _sanitize_field
+from src.api.response import build_diagnostics, build_citations
+from src.utils.sanitize import sanitize_field
 from src.utils.env import safe_int_env
 from src.utils.timing import measure_latency
 from src.eval.metrics import estimate_hallucination_rate, calculate_citation_coverage

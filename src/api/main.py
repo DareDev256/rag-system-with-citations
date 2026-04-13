@@ -8,7 +8,6 @@ the retrieval, LLM, and response-builder modules. Security enforcement
 
 import logging
 import os
-import re
 
 from contextlib import asynccontextmanager
 
@@ -22,25 +21,18 @@ from src.api.middleware import (
     apply_security_headers,
     authenticate,
     check_rate_limit,
-    sanitize_output,
 )
 from src.api.schemas import QueryRequest, QueryResponse
 from src.api.response import build_citations, build_diagnostics
 from src.retrieval.search import perform_search
 from src.llm.synthesize import classify_query_async, synthesize_answer_async
 from src.utils.ip import resolve_client_ip
+from src.utils.sanitize import sanitize_log, sanitize_output
 from src.utils.timing import TimingContext
 
 # Logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("rag_api")
-
-_CONTROL_RE = re.compile(r'[\x00-\x1f\x7f]')
-
-
-def _safe_log_query(query: str, max_len: int = 200) -> str:
-    """Strip control chars and truncate for safe log output."""
-    return _CONTROL_RE.sub(' ', query)[:max_len]
 
 
 @asynccontextmanager
@@ -54,7 +46,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.22.0",
+    version="1.23.0",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -119,7 +111,7 @@ async def query_endpoint(request: QueryRequest, req: Request):
         # 1. Classify
         category = await classify_query_async(original_query)
         request_id = req.state.request_id if hasattr(req.state, "request_id") else "unknown"
-        logger.info("Query: %s | Category: %s | request_id=%s", _safe_log_query(original_query), category, request_id)
+        logger.info("Query: %s | Category: %s | request_id=%s", sanitize_log(original_query), category, request_id)
 
         # 2. Rewrite if ambiguous
         final_query = original_query

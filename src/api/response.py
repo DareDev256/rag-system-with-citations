@@ -13,22 +13,10 @@ from src.api.schemas import Citation, Diagnostics
 from src.eval.metrics import estimate_hallucination_rate, calculate_answer_quality
 from src.llm.citations import analyze_citations
 from src.llm.prompt import build_context_str
+from src.utils.sanitize import sanitize_field
 
 if TYPE_CHECKING:
     from src.llm.citations import CitationAnalysis
-
-
-def _sanitize_field(text, sanitize_fn) -> str:
-    """Apply output sanitizer to a single field, handling None and non-str types.
-
-    JSON metadata can contain non-string values (e.g. integer doc_ids).
-    Coerces to str before sanitizing to prevent TypeError in re.sub().
-    Uses explicit ``is None`` instead of falsy check so valid values
-    like ``0`` are preserved rather than silently dropped.
-    """
-    if text is None:
-        return ""
-    return sanitize_fn(str(text))
 
 
 def build_citations(
@@ -43,10 +31,10 @@ def build_citations(
     """
     return [
         Citation(
-            doc_id=_sanitize_field(res.get("doc_id"), sanitize_fn),
-            snippet=_sanitize_field(res.get("snippet"), sanitize_fn),
+            doc_id=sanitize_field(res.get("doc_id"), sanitize_fn),
+            snippet=sanitize_field(res.get("snippet"), sanitize_fn),
             score=res.get("score"),
-            source=_sanitize_field(res.get("source"), sanitize_fn) or None,
+            source=sanitize_field(res.get("source"), sanitize_fn) or None,
         )
         for res in synthesis_result.get("citations_used", [])
     ]

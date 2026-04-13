@@ -7,7 +7,8 @@ or OpenAI — pure functions with deterministic inputs.
 
 import pytest
 
-from src.api.response import _sanitize_field, build_citations, build_diagnostics
+from src.api.response import build_citations, build_diagnostics
+from src.utils.sanitize import sanitize_field
 from src.api.schemas import Citation, Diagnostics
 
 
@@ -30,37 +31,37 @@ _SEARCH_RESULTS = [
 ]
 
 
-# ── _sanitize_field ───────────────────────────────────────────────
+# ── sanitize_field ───────────────────────────────────────────────
 
 class TestSanitizeField:
 
     def test_applies_fn_to_text(self):
-        assert _sanitize_field("hello", str.upper) == "HELLO"
+        assert sanitize_field("hello", str.upper) == "HELLO"
 
     def test_none_returns_empty(self):
-        assert _sanitize_field(None, str.upper) == ""
+        assert sanitize_field(None, str.upper) == ""
 
     def test_empty_string_returns_empty(self):
         """Empty string is falsy — should return empty, not crash."""
-        assert _sanitize_field("", str.upper) == ""
+        assert sanitize_field("", str.upper) == ""
 
     def test_strips_control_chars(self):
-        assert _sanitize_field("ok\x00bad\x01", _strip_control) == "okbad"
+        assert sanitize_field("ok\x00bad\x01", _strip_control) == "okbad"
 
     def test_integer_value_coerced_to_str(self):
         """JSON metadata can have integer doc_ids — must not TypeError on re.sub."""
-        assert _sanitize_field(123, str.upper) == "123"
+        assert sanitize_field(123, str.upper) == "123"
 
     def test_float_value_coerced_to_str(self):
-        assert _sanitize_field(0.95, str) == "0.95"
+        assert sanitize_field(0.95, str) == "0.95"
 
     def test_zero_preserved_not_dropped(self):
         """0 is falsy but valid — must not be silently swallowed."""
-        assert _sanitize_field(0, str) == "0"
+        assert sanitize_field(0, str) == "0"
 
     def test_false_preserved_not_dropped(self):
         """False is falsy but should be coerced to 'False', not ''."""
-        assert _sanitize_field(False, str) == "False"
+        assert sanitize_field(False, str) == "False"
 
 
 # ── build_citations ───────────────────────────────────────────────

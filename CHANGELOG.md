@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.23.0] - 2026-04-13
+
+### Changed
+- **Extracted text sanitization into `src/utils/sanitize.py`** — consolidated three scattered sanitization functions (`sanitize_output` from middleware.py, `_safe_log_query`/`_CONTROL_RE` from main.py, `_sanitize_field` from response.py) into a single authoritative module. Each function serves a distinct pipeline stage: `sanitize_output` (LLM responses → client, preserves whitespace), `sanitize_log` (queries → log output, strips all control chars + truncates), `sanitize_field` (null-safe metadata coercion). Removed duplicate regex patterns and unused `re` import from main.py. All 554 tests pass, 5 test imports updated to new paths.
+
 ## [1.22.0] - 2026-04-12
 
 ### Changed

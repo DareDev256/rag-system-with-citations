@@ -19,18 +19,9 @@ from starlette.responses import Response
 
 from src.utils.env import safe_int_env
 from src.utils.ip import resolve_client_ip
+from src.utils.sanitize import CONTROL_CHAR_RE, sanitize_output
 
 logger = logging.getLogger("rag_api")
-
-
-# ─── Output sanitization ─────────────────────────────────────────────
-# LLM responses are untrusted — strip control chars before returning to client.
-CONTROL_CHAR_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
-
-
-def sanitize_output(text: str) -> str:
-    """Strip C0 control chars from LLM output (preserves \\n, \\r, \\t)."""
-    return CONTROL_CHAR_RE.sub('', text)
 
 
 # ─── Request Body Size Limit (CWE-400) ───────────────────────────────

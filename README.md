@@ -3,7 +3,7 @@
 ![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-3776ab?style=flat-square&logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
-![Version](https://img.shields.io/badge/version-1.22.0-blue?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.23.0-blue?style=flat-square)
 ![Tests](https://img.shields.io/badge/tests-554_passing-2ea44f?style=flat-square)
 ![Security](https://img.shields.io/badge/defense_layers-22-e05d44?style=flat-square&logo=shield)
 
@@ -309,6 +309,7 @@ src/
 └── utils/
     ├── env.py           # Safe env var parsing (bounded int)
     ├── ip.py            # Trusted proxy IP resolution
+    ├── sanitize.py      # Text sanitization — output, log, and field-level (single source of truth)
     └── timing.py        # Latency decorator + TimingContext context manager
 ```
 22-layer defense-in-depth covering webhook signature verification, API key authentication, rate limiting, input validation, output sanitization, security headers, request tracing, LLM timeout enforcement, indirect prompt injection defense, and more. See **[docs/security.md](docs/security.md)** for the full security architecture, threat model, and known gaps.
