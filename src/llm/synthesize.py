@@ -103,7 +103,15 @@ def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any
     }
 
 
-_SYNTHESIS_ERROR = {"answer": "Error generating answer.", "citations_used": [], "confidence": 0.0}
+def _synthesis_error() -> Dict[str, Any]:
+    """Return a fresh error-fallback dict on every call.
+
+    Avoids sharing a mutable ``[]`` reference across all error responses —
+    ``dict(constant)`` is a shallow copy, so the inner list would be the
+    same object, creating a latent mutation bug if any downstream code
+    appends to ``citations_used``.
+    """
+    return {"answer": "Error generating answer.", "citations_used": [], "confidence": 0.0}
 
 
 def _safe_llm_call(model: str, messages: List[Dict[str, str]], parser, fallback, label: str, **kwargs: Any):
@@ -153,7 +161,7 @@ def synthesize_answer(query: str, search_results: List[Dict]) -> Dict[str, Any]:
     prompt = _build_synthesis_prompt(query, search_results)
     return _safe_llm_call(
         SYNTHESIS_MODEL, _synthesis_messages(prompt),
-        lambda r: _parse_synthesis(r, search_results), dict(_SYNTHESIS_ERROR),
+        lambda r: _parse_synthesis(r, search_results), _synthesis_error(),
         "synthesis", temperature=0.0, max_tokens=500,
     )
 
@@ -174,6 +182,6 @@ async def synthesize_answer_async(query: str, search_results: List[Dict]) -> Dic
     prompt = _build_synthesis_prompt(query, search_results)
     return await _safe_llm_call_async(
         SYNTHESIS_MODEL, _synthesis_messages(prompt),
-        lambda r: _parse_synthesis(r, search_results), dict(_SYNTHESIS_ERROR),
+        lambda r: _parse_synthesis(r, search_results), _synthesis_error(),
         "synthesis", temperature=0.0, max_tokens=500,
     )

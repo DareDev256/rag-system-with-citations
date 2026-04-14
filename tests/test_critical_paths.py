@@ -19,7 +19,7 @@ from src.llm.synthesize import (
     _safe_llm_call_async,
     _parse_classification,
     _parse_synthesis,
-    _SYNTHESIS_ERROR,
+    _synthesis_error,
 )
 from src.llm.client import call_llm, call_llm_async
 

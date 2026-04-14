@@ -6,6 +6,7 @@ the retrieval, LLM, and response-builder modules. Security enforcement
 (rate limiting, auth, headers, body size) lives in middleware.py.
 """
 
+import asyncio
 import logging
 import os
 
@@ -46,7 +47,7 @@ async def lifespan(app):
 app = FastAPI(
     title="RAG System with Citations",
     description="Production-ready RAG API with source attribution and confidence scoring",
-    version="1.24.0",
+    version="1.24.1",
     docs_url=None if os.getenv("DISABLE_DOCS") else "/docs",
     redoc_url=None if os.getenv("DISABLE_DOCS") else "/redoc",
     lifespan=lifespan,
@@ -118,9 +119,10 @@ async def query_endpoint(request: QueryRequest, req: Request):
         if category == "ambiguous":
             pass
 
-        # 3. Retrieve
+        # 3. Retrieve — offload to thread pool to avoid blocking the event
+        #    loop during CPU-intensive FAISS search + embedding inference.
         with TimingContext() as retrieval_timer:
-            search_results = perform_search(final_query, k=request.k)
+            search_results = await asyncio.to_thread(perform_search, final_query, k=request.k)
 
         # 4. Synthesize
         with TimingContext() as synthesis_timer:

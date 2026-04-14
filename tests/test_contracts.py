@@ -14,7 +14,7 @@ from src.llm.prompt import format_rag_prompt, format_classification_prompt, buil
 from src.llm.citations import calculate_confidence, extract_cited_doc_ids, CITATION_PATTERN
 from src.llm.synthesize import (
     _parse_synthesis, _parse_classification, _client_kwargs,
-    _SYNTHESIS_ERROR, _classification_messages, _synthesis_messages,
+    _synthesis_error, _classification_messages, _synthesis_messages,
 )
 from src.api.response import build_diagnostics, build_citations
 from src.utils.sanitize import sanitize_field
@@ -139,12 +139,14 @@ class TestParseSynthesisContract:
         parsed = _parse_synthesis(self._make_response("Answer text."), [])
         assert parsed["confidence"] == 0.0
 
-    def test_synthesis_error_sentinel_is_independent_copy(self):
-        """dict(_SYNTHESIS_ERROR) must produce a new dict each call."""
-        a = dict(_SYNTHESIS_ERROR)
-        b = dict(_SYNTHESIS_ERROR)
+    def test_synthesis_error_returns_independent_copies(self):
+        """_synthesis_error() must return a fresh dict with independent lists."""
+        a = _synthesis_error()
+        b = _synthesis_error()
         a["answer"] = "mutated"
+        a["citations_used"].append({"doc_id": "leak"})
         assert b["answer"] == "Error generating answer."
+        assert b["citations_used"] == [], "inner list must not be shared across calls"
 
 
 # ─── Classification Contract ────────────────────────────────────────

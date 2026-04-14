@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.24.1] - 2026-04-14
+
+### Fixed
+- **Event loop blocking in `/query` endpoint** — `perform_search` (FAISS search + embedding inference) was called synchronously inside the async handler, blocking the event loop during CPU-intensive operations. All concurrent requests (including `/health` probes) would stall until search completed. Now offloaded via `asyncio.to_thread()` so the event loop stays responsive under load.
+- **Shallow copy mutation bug in synthesis error fallback** — `_SYNTHESIS_ERROR` was a module-level dict with a mutable `[]` for `citations_used`. The `dict()` shallow copy shared that list across all error responses — if any downstream code mutated it, all subsequent fallbacks would be corrupted. Replaced with `_synthesis_error()` factory function that returns a fresh dict with independent lists on every call.
+
 ## [1.24.0] - 2026-04-13
 
 ### Security
