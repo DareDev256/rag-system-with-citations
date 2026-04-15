@@ -176,6 +176,22 @@ class TestParseClassification:
         resp = _make_response("I think this is a factual question about science.")
         assert _parse_classification(resp) == "exploratory"
 
+    def test_none_content_defaults_to_exploratory(self):
+        """OpenAI content filter or refusal returns content=None."""
+        msg = MagicMock()
+        msg.content = None
+        choice = MagicMock()
+        choice.message = msg
+        resp = MagicMock()
+        resp.choices = [choice]
+        assert _parse_classification(resp) == "exploratory"
+
+    def test_empty_choices_defaults_to_exploratory(self):
+        """Empty choices list from API error — should not IndexError."""
+        resp = MagicMock()
+        resp.choices = []
+        assert _parse_classification(resp) == "exploratory"
+
 
 # ── calculate_confidence _available_ids optimization ─────────────
 
@@ -251,3 +267,32 @@ class TestExtractCitedDocIds:
     def test_available_ids_filters_hallucinated(self):
         result = extract_cited_doc_ids("[real] and [fake].", available_ids={"real"})
         assert result == {"real"}
+
+
+# ── _parse_synthesis None content / empty choices ─────────────────
+
+class TestParseSynthesisNoneContent:
+    """Synthesis parser must handle None content and empty choices
+    without raising — returns the standard error dict instead."""
+
+    def test_none_content_returns_error_dict(self):
+        """OpenAI content filter returns content=None during synthesis."""
+        msg = MagicMock()
+        msg.content = None
+        choice = MagicMock()
+        choice.message = msg
+        resp = MagicMock()
+        resp.choices = [choice]
+        result = _parse_synthesis(resp, _DOCS)
+        assert result["answer"] == "Error generating answer."
+        assert result["citations_used"] == []
+        assert result["confidence"] == 0.0
+
+    def test_empty_choices_returns_error_dict(self):
+        """Empty choices list should not IndexError."""
+        resp = MagicMock()
+        resp.choices = []
+        result = _parse_synthesis(resp, _DOCS)
+        assert result["answer"] == "Error generating answer."
+        assert result["citations_used"] == []
+        assert result["confidence"] == 0.0

@@ -65,14 +65,37 @@ def _synthesis_messages(prompt: str) -> List[Dict[str, str]]:
 
 
 def _parse_classification(response: Any) -> str:
-    """Parse LLM classification response into a valid category."""
-    category = response.choices[0].message.content.strip().lower()
+    """Parse LLM classification response into a valid category.
+
+    Guards against ``None`` content (content-filter, tool-call, refusal)
+    and empty ``choices`` (rare API errors) — both are normal OpenAI
+    conditions that should degrade to the safe default, not raise.
+    """
+    if not response.choices:
+        logger.warning("Classification response has no choices")
+        return "exploratory"
+    content = response.choices[0].message.content
+    if content is None:
+        logger.warning("Classification response content is None (content filter or refusal)")
+        return "exploratory"
+    category = content.strip().lower()
     return category if category in _VALID_CATEGORIES else "exploratory"
 
 
 def _parse_synthesis(response: Any, search_results: List[Dict]) -> Dict[str, Any]:
-    """Parse LLM synthesis response into answer dict with citations and confidence."""
-    answer = response.choices[0].message.content.strip()
+    """Parse LLM synthesis response into answer dict with citations and confidence.
+
+    Guards against ``None`` content and empty ``choices`` — returns the
+    standard error dict so the caller never sees a raw ``AttributeError``.
+    """
+    if not response.choices:
+        logger.warning("Synthesis response has no choices")
+        return _synthesis_error()
+    content = response.choices[0].message.content
+    if content is None:
+        logger.warning("Synthesis response content is None (content filter or refusal)")
+        return _synthesis_error()
+    answer = content.strip()
 
     analysis = analyze_citations(answer, search_results)
 

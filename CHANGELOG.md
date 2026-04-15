@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.24.2] - 2026-04-15
+
+### Fixed
+- **LLM response parsers crash on `None` content (CWE-754)** — `_parse_classification` and `_parse_synthesis` called `.strip()` on `response.choices[0].message.content` without guarding against `None` (content filter, tool calls, refusal) or empty `choices` (API errors). While `_safe_llm_call` caught the resulting `AttributeError`/`IndexError`, the error was logged as a generic failure with no diagnostic signal — indistinguishable from network errors or malformed responses. Now both parsers explicitly detect these conditions, log the specific cause, and return clean fallbacks without hitting the exception handler.
+
+### Added
+- 4 new tests (570 total): `None` content and empty choices coverage for both classification and synthesis parsers.
+
 ## [1.24.1] - 2026-04-14
 
 ### Fixed
