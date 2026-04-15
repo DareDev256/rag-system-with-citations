@@ -12,6 +12,8 @@ import re
 import threading
 import time
 import uuid
+from typing import Optional
+
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -184,7 +186,7 @@ if _raw_keys:
 _PUBLIC_PATHS = {"/health", "/docs", "/redoc", "/openapi.json"}
 
 
-def authenticate(request: Request) -> str | None:
+def authenticate(request: Request) -> Optional[str]:
     """Return an error message if auth fails, None if OK."""
     if not _API_KEYS:
         return None

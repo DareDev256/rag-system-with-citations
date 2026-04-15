@@ -41,7 +41,7 @@ def extract_cited_doc_ids(answer: str, available_ids: Optional[Set[str]] = None)
     return cited
 
 
-@dataclasses.dataclass(frozen=True, slots=True)
+@dataclasses.dataclass(frozen=True)
 class CitationAnalysis:
     """Pre-computed citation metrics for an answer + search-results pair.
 
@@ -49,6 +49,8 @@ class CitationAnalysis:
     ``_parse_synthesis`` and ``build_diagnostics`` — available IDs, cited IDs,
     valid/hallucinated partitions, and coverage ratio are all computed once.
     """
+    __slots__ = ("available_ids", "all_cited_ids", "valid_cited_ids",
+                 "hallucinated_ids", "coverage")
     available_ids: frozenset
     all_cited_ids: frozenset
     valid_cited_ids: frozenset

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.24.3] - 2026-04-15
+
+### Fixed
+- **Python 3.9 compatibility broken by 3.10+ syntax (CWE-710)** — `CitationAnalysis` dataclass used `slots=True` (Python 3.10+), crashing 9 test files at collection time with `TypeError: dataclass() got an unexpected keyword argument 'slots'`. Replaced with manual `__slots__` definition for the same memory/performance benefit on Python 3.9+. Also fixed `str | None` union type annotation in `authenticate()` (PEP 604, 3.10+) → `Optional[str]` with proper `typing` import.
+
 ## [1.24.2] - 2026-04-15
 
 ### Fixed
