@@ -4,10 +4,9 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)
 ![FAISS](https://img.shields.io/badge/FAISS-vector_search-4A154B?style=flat-square)
 ![Version](https://img.shields.io/badge/version-1.24.3-blue?style=flat-square)
-![Tests](https://img.shields.io/badge/tests-570_passing-2ea44f?style=flat-square)
-![Security](https://img.shields.io/badge/defense_layers-25-e05d44?style=flat-square&logo=shield)
+[![CI](https://github.com/DareDev256/rag-system-with-citations/actions/workflows/ci.yml/badge.svg)](https://github.com/DareDev256/rag-system-with-citations/actions/workflows/ci.yml)
 
-A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 18-layer defense-in-depth security.
+A production-hardened Retrieval-Augmented Generation API that delivers grounded answers with explicit source citations, real-time confidence scoring, and 22 layers of defense-in-depth, each mapped to a CWE.
 
 **Every answer must cite its sources. If it can't, the confidence score reflects that.**
 
@@ -25,7 +24,7 @@ Standard LLM APIs hallucinate freely and report high confidence regardless. This
 - **22-layer security** — rate limiting (thread-safe), API auth, input validation, output sanitization, HSTS, CSP (validated), request tracing, SSRF prevention (base URL + embeddings + LLM proxy), webhook HMAC verification, header injection defense, auth failure logging, pinned dependencies, CI security scanning, indirect prompt injection defense (snippet truncation + injection pattern neutralization + XML delimiter isolation), **metadata schema validation** (CWE-20 — type/length/format enforcement on ingest + storage load)
 - **Provider-agnostic** — swap OpenAI for Claude, Ollama, or any OpenAI-compatible proxy with one env var
 - **Webhook-triggered reindexing** — `POST /webhook/reindex` with HMAC-SHA256 signature verification for CMS/CI pipeline integration
-- **554 tests, zero external deps** — full mock coverage across 20 suites, runs without API keys or FAISS indexes
+- **Fully mocked test suite, zero external deps** — 20 suites under `tests/`, runs green in CI without API keys, network, or a FAISS index
 
 ## Architecture
 
@@ -211,34 +210,34 @@ Full architecture and threat model: **[docs/security.md](docs/security.md)**
 
 ## Testing
 
-547 tests across 20 suites. All mocked — runs without API keys, FAISS indexes, or network access:
+20 suites under `tests/`, all mocked, so they run without API keys, FAISS indexes, or network access. For the current test count, run the suite:
 
 ```bash
 pytest tests/ -v
 ```
 
-| Suite | Tests | Scope |
-|-------|------:|-------|
-| `test_hardening.py` | 95 | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
-| `test_edge_cases.py` | 62 | Unicode, boundary values, type coercion, hallucination edge cases |
-| `test_core.py` | 52 | Citation extraction, confidence scoring, schema validation, metrics |
-| `test_response_builders.py` | 40 | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |
-| `test_contracts.py` | 35 | Behavioral interface tests — prompt safety, client factories, citation patterns |
-| `test_prompt_injection.py` | 29 | Indirect injection defense — truncation, pattern blocking, false-positive avoidance, XML delimiters |
-| `test_search.py` | 19 | Embedder singleton, search orchestration, model failure recovery |
-| `test_integration_gaps.py` | 18 | Lifespan, ingest pipeline, client factories, race conditions |
-| `test_ip_resolution.py` | 18 | Proxy extraction, spoofing resistance, IPv6, fallback |
-| `test_vector_store.py` | 19 | FAISS wrapper — load/save/search, dimension validation, atomic save crash-safety |
-| `test_middleware.py` | 17 | Body size, request ID, global exception handler |
-| `test_resilience.py` | 16 | File I/O failures, corrupted state, singleton poisoning |
-| `test_llm.py` | 14 | Sync LLM mocks — classification, synthesis, error handling |
-| `test_llm_async.py` | 14 | Async LLM mocks — parity with sync implementations |
-| `test_api.py` | 14 | FastAPI endpoint tests — happy path, validation, diagnostics |
-| `test_evaluation.py` | 13 | Evaluation pipeline, keyword matching, CSV output |
-| `test_auth.py` | 10 | API key auth — Bearer/X-API-Key, rejection, constant-time |
-| `test_recent_refactors.py` | 22 | CitationAnalysis pipeline, prompt constants, synthesis builder, dimension validation |
-| `test_critical_paths.py` | 30 | _safe_llm_call error fallbacks, call_llm delegation, classification parsing, confidence optimization, doc_id edge cases |
-| `test_chunked_bypass.py` | 8 | Chunked encoding enforcement, early abort, multi-chunk accumulation |
+| Suite | Scope |
+|-------|-------|
+| `test_hardening.py` | Security headers, prompt injection, rate limiting, SSRF prevention, error sanitization |
+| `test_edge_cases.py` | Unicode, boundary values, type coercion, hallucination edge cases |
+| `test_core.py` | Citation extraction, confidence scoring, schema validation, metrics |
+| `test_response_builders.py` | Citation assembly, diagnostics math, LLM output parsing, None-guard defense, type coercion |
+| `test_contracts.py` | Behavioral interface tests — prompt safety, client factories, citation patterns |
+| `test_prompt_injection.py` | Indirect injection defense — truncation, pattern blocking, false-positive avoidance, XML delimiters |
+| `test_search.py` | Embedder singleton, search orchestration, model failure recovery |
+| `test_integration_gaps.py` | Lifespan, ingest pipeline, client factories, race conditions |
+| `test_ip_resolution.py` | Proxy extraction, spoofing resistance, IPv6, fallback |
+| `test_vector_store.py` | FAISS wrapper — load/save/search, dimension validation, atomic save crash-safety |
+| `test_middleware.py` | Body size, request ID, global exception handler |
+| `test_resilience.py` | File I/O failures, corrupted state, singleton poisoning |
+| `test_llm.py` | Sync LLM mocks — classification, synthesis, error handling |
+| `test_llm_async.py` | Async LLM mocks — parity with sync implementations |
+| `test_api.py` | FastAPI endpoint tests — happy path, validation, diagnostics |
+| `test_evaluation.py` | Evaluation pipeline, keyword matching, CSV output |
+| `test_auth.py` | API key auth — Bearer/X-API-Key, rejection, constant-time |
+| `test_recent_refactors.py` | CitationAnalysis pipeline, prompt constants, synthesis builder, dimension validation |
+| `test_critical_paths.py` | _safe_llm_call error fallbacks, call_llm delegation, classification parsing, confidence optimization, doc_id edge cases |
+| `test_chunked_bypass.py` | Chunked encoding enforcement, early abort, multi-chunk accumulation |
 
 All tests use mocks — no FAISS index, no OpenAI API calls, no external dependencies required to run.
 
